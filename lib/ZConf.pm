@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.0.0
+Version 0.0.1
 
 =cut
 
-our $VERSION = '0.0.0';
+our $VERSION = '0.0.1';
 
 =head1 SYNOPSIS
 
@@ -46,7 +46,7 @@ is returned. The hash can contain various initization options.
 
 When it is run for the first time, it creates a filesystem only config file.
 
-=head3 file
+=item file
 
 The default is 'xdf_config_home/zconf.zml', which is generally '~/.config/zconf.zml'.
 
@@ -3106,35 +3106,35 @@ Config not loaded.
 
 Set name is not a legit name.
 
-=head2 ERROR CHECKING
+=head1 ERROR CHECKING
 
 This can be done by checking $zconf->{error} to see if it is defined. If it is defined,
 The number it contains is the corresponding error code. A description of the error can also
 be found in $zconf->{errorString}, which is set to "" when there is no error.
 
-=head2 INTERNALS
+=head1 INTERNALS
 
 ZConf stores the object information in a hash. The keys are 'conf', 'args', 'zconf',
 'user', 'error', and 'errorString'.
 
-=head3 conf
+=head2 conf
 
 This is a hash whose keys represent various configs. Each item in the hash is another hash.
 Each key of that a value in a config.
 
-=head3 args
+=head2 args
 
 This is the arguements currently in use by ZConf.
 
-=head3 zconf
+=head2 zconf
 
 This is the parsed configuration settings for ZConf as pulled from xdg_config_home()."/zconf.zml".
 
-=head3 error
+=head2 error
 
 This is contains the error code if there is an error. It is undefined when none is present.
 
-=head3 errorString
+=head2 errorString
 
 This contains a description of the error when one is present. When one is not present it is "".  
 

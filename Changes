@@ -1,5 +1,8 @@
 Revision history for ZConf
 
-0.01    Date/time
-        First version, released on an unsuspecting world.
+0.0.1	2008-05-21/15:20
+		Fixed some formatting issues with the POD.
+
+0.0.0	2008-05-20/17:38
+		Initial release.
 
