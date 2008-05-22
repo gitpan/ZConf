@@ -1,8 +1,20 @@
 Revision history for ZConf
 
+0.0.2	2008-05-21/19:31
+		-No longer requires a hash be defined with new.
+		-Fix default set deciding for writeSetFromHash. It was using "defualt" if
+			the set was not defined. Now it uses '$self->{args}{default}'.
+		-Fixed sync issues with writeSetFromHash.
+		-Fix chooseSet* as they were returning 'default' instead of '$self->{args}{default}'
+			when no chooser or the like was present.
+		-Fix chooseSet* warnings and handling of bad set names. It now returns
+			'$self->{args}{default}' on error.
+		-Fix issue with read trying to sync and not passing writeSetFromLoadedConfigFile
+			all of %args.
+
 0.0.1	2008-05-21/15:20
-		Fixed some formatting issues with the POD.
+		-Fixed some formatting issues with the POD.
 
 0.0.0	2008-05-20/17:38
-		Initial release.
+		-Initial release.
 

@@ -1,3 +1,4 @@
 -implement file fall through on errors
 -implement config listing
 -syncing between backends
+-implement a test to see if a specific set exists for a config

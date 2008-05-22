@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.0.1
+Version 0.0.2
 
 =cut
 
-our $VERSION = '0.0.1';
+our $VERSION = '0.0.2';
 
 =head1 SYNOPSIS
 
@@ -54,7 +54,10 @@ The default is 'xdf_config_home/zconf.zml', which is generally '~/.config/zconf.
 
 #create it...
 sub new {
-	my %args= %{$_[1]};
+	my %args;
+	if(defined($_[1])){
+		%args= %{$_[1]};
+	};
 
 	#set the config file if it is not already set
 	if(!defined($args{file})){
@@ -339,7 +342,7 @@ sub chooseSet{
 	$self->errorBlank;
 
 	my $returned=undef;
-		
+
 	#get the sets
 	if($self->{args}{backend} eq "file"){
 		$returned=$self->chooseSetFile($config);
@@ -349,11 +352,11 @@ sub chooseSet{
 		};
 	};
 
-	if(!$returned){
-		return undef;
+	if(!defined($returned)){
+		return $self->{args}{default};
 	};
 		
-	return 1;
+	return $returned;
 };
 
 
@@ -370,22 +373,17 @@ be used by programs.
 sub chooseSetFile{
 	my ($self, $config)= @_;
 	
-	#return false if the config is not set
-	if (!defined($config)){
-		return 0;
-	};
-		
 	#the path to the file
 	my $chooser=$self->{args}{base}."/".$config."/.chooser";
 		
 	#if the chooser does not exist, use the default
 	if(!-f $chooser){
-		return "default";
+		return $self->{args}{default};
 	};
 		
 	#open the file to 
 	if(!open("READCHOOSER", $chooser)){
-		return "default";
+		return $self->{args}{default};
 	};
 	my $chooserstring=<READCHOOSER>;
 	close("READCHOOSER");
@@ -393,13 +391,15 @@ sub chooseSetFile{
 	my ($success, $choosen)=choose($chooserstring);
 
 	if(!defined($choosen)){
-		return "default";
+		return $self->{args}{default};
 	};
 
 	if (!$self->setNameLegit($choosen)){
-		return "default";
+		warn("zconf chooseSetLDAP:27: '".$choosen."' is not a legit set name. Using the".
+				" default of '".$self->{args}{default}."'.");
+		return $self->{args}{default};
 	};
-
+	
 	return $choosen;
 };
 
@@ -416,22 +416,18 @@ be used by programs.
 sub chooseSetLDAP{
 	my ($self, $config)= @_;
 	
-	#return false if the config is not set
-	if (!defined($config)){
-		return undef;
-	};
-
 	my $chooserstring=$self->readChooserLDAP($config);
 
 	my ($success, $choosen)=choose($chooserstring);
 
 	if(!defined($choosen)){
-		return "default";
+		return $self->{args}{default};
 	};
 
 	if (!$self->setNameLegit($choosen)){
-		warn("zconf chooseSet");
-		return "default";
+		warn("zconf chooseSetLDAP:27: '".$choosen."' is not a legit set name. Using the".
+				" default of '".$self->{args}{default}."'.");
+		return $self->{args}{default};
 	};
 
 	return $choosen;
@@ -525,7 +521,7 @@ sub configExists{
 			$returned=$self->configExistsLDAP($config);
 		};
 	};
-		
+
 	if(!$returned){
 		return undef;
 	};
@@ -612,8 +608,8 @@ sub configExistsLDAP{
 	my $lastitem=$lastitemA[$#lastitemA];
 
 	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
-	$ldap->unbind;
 	my %hashedmesg=LDAPhash($ldapmesg);
+	$ldap->unbind;
 	if(!defined($hashedmesg{$dn})){
 		return undef;
 	};
@@ -1267,7 +1263,7 @@ sub read{
 		
 	#attempt to sync the config locally if not using the file backend
 	if($self->{args}{backend} ne "file"){
-		my $syncReturn=$self->writeSetFromLoadedConfigFile({config=>$args{config}});
+		my $syncReturn=$self->writeSetFromLoadedConfigFile(\%args);
 		if (!$syncReturn){
 			print "zconf read error: Could not sync config to the loaded config.";
 		};
@@ -2350,7 +2346,7 @@ sub writeSetFromHash{
 
 	#sets the set to default if it is not defined
 	if (!defined($args{set})){
-		$args{set}="default";
+		$args{set}=$self->{args}{default};
 	};
 
 	my $returned=undef;
@@ -2370,9 +2366,9 @@ sub writeSetFromHash{
 		
 	#attempt to sync the set locally if not using the file backend
 	if($self->{args}{backend} ne "file"){
-		my $syncReturn=$self->writeSetFromLoadedConfigFile({config=>$args{config}}, \%hash);
+		my $syncReturn=$self->writeSetFromHashFile({config=>$args{config},set=>$args{set}}, \%hash);
 		if (!$syncReturn){
-				print "zconf read error: Could not sync config to the loaded config.";
+				warn("zconf writeSetFromHash:9: Could not sync config to the loaded config.");
 		};
 	};
 
@@ -2427,16 +2423,6 @@ sub writeSetFromHashFile{
 		$self->{error}=12;
 		$self->{errorString}="'".$args{config}."' does not exist.";
 		return undef;			
-	};
-
-	#sets the set to default if it is not defined
-	if (!defined($args{set})){
-		$args{set}="default";
-	};
-		
-	#sets the set to default if it is not defined
-	if (!defined($args{autoCreateConfig})){
-		$args{autoCreateConfig}="0";
 	};
 		
 	#the path to the file
