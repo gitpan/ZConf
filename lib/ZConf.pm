@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.0.2
+Version 0.0.3
 
 =cut
 
-our $VERSION = '0.0.2';
+our $VERSION = '0.0.3';
 
 =head1 SYNOPSIS
 
@@ -3170,6 +3170,44 @@ This is the server to use for LDAP connections.
 =head3 ldap/<profile>/password
 
 This is the password to use for when connecting to the server.
+
+=head1 ZConf LDAP Schema
+
+	# 1.3.6.1.4.1.26481 Zane C. Bowers
+	#  .2 ldap
+	#   .7 zconf
+	#    .0 zconfData
+	#    .1 zconfChooser
+	#    .2 zconfSet
+	
+	#zmsServerPassword
+	attributeType ( 1.3.6.1.4.1.26481.2.7.0
+		NAME 'zconfData'
+		DESC 'Data attribute for a zconf entry.'
+		SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+		EQUALITY caseExactMatch
+		)
+	
+	attributeType ( 1.3.6.1.4.1.26481.2.7.1
+		NAME 'zconfChooser'
+		DESC 'Chooser attribute for a zconf entry.'
+		SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+		EQUALITY caseExactMatch
+		)
+	
+	attributeType ( 1.3.6.1.4.1.26481.2.7.2
+		NAME 'zconfSet'
+		DESC 'A zconf set name available in a entry.'
+		SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+		EQUALITY caseExactMatch
+		)
+
+	#zmsServerProfile
+	objectclass ( 1.3.6.1.4.1.26481.2.7
+		NAME 'zconf'
+		DESC 'A zconf entry.'
+		MAY ( cn $ zconfData $ zconfChooser $ zconfSet )
+		)
 
 =head1 AUTHOR
 

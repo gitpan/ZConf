@@ -1,5 +1,8 @@
 Revision history for ZConf
 
+0.0.3	2008-05-22/14:20
+		-Add LDAP schema to the pod.
+
 0.0.2	2008-05-21/19:31
 		-No longer requires a hash be defined with new.
 		-Fix default set deciding for writeSetFromHash. It was using "defualt" if
