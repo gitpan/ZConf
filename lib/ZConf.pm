@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.0.4
+Version 0.1.5
 
 =cut
 
-our $VERSION = '0.0.4';
+our $VERSION = '0.1.5';
 
 =head1 SYNOPSIS
 
@@ -100,7 +100,13 @@ sub new {
 	};
 
 	#tries to parse the zconf.zml
-	my %zconf=parseZML($zconfzmlstring);
+	my $zml=ZML->new();
+	$zml->parse($zconfzmlstring);
+	if($zml->{error}){
+		warn("ZConf new:28: ZML->parse error, '".$zml->{error}."', '".$zml->{errorString}."'.");
+		return undef;
+	};
+	my %zconf=%{$zml->{var}};
 
 	#if defaultChooser is defined, use it to find what the default should be
 	if(defined($zconf{defaultChooser})){
@@ -1130,46 +1136,6 @@ sub getSet{
 	return $self->{set}{$config};
 };
 
-=head2 parseZML
-
-A function that has not been removed as it is still being used in a few places.
-
-=cut
-	
-#parse ZML
-#for internal use only
-sub parseZML{
-	my ($zmlstring)= @_;
-
-	my %zml=();
-
-	my @rawdata=split(/\n/, $zmlstring);
-
-	my $rawdataInt=0;
-	my $prevVar=undef;
-	while(defined($rawdata[$rawdataInt])){
-		if($rawdata[$rawdataInt] =~ /^ /){
-			#this if statement prevents it from being ran on the first line if it is not properly formated
-			if(!defined($prevVar)){
-				chomp($rawdata[$rawdataInt]);
-				$rawdata[$rawdataInt]=~s/^ //;#remove the trailing space
-				#add in the line return and 
-				$zml{$prevVar}=$zml{$prevVar}."\n".$rawdata[$rawdataInt];
-			};
-		}else{
-			#split it into two
-			my @linesplit=split(/=/, $rawdata[$rawdataInt], 2);
-			chomp($linesplit[1]);
-			$zml{$linesplit[0]}=$linesplit[1];
-			$prevVar=$linesplit[0];#this is used if the next line is a continuation from the previous
-		};
-
-		$rawdataInt++;
-	};
-
-	return (%zml);
-};
-
 =head2 read
 
 This reads a config. The only accepted option is the config name.
@@ -1470,9 +1436,20 @@ sub readLDAP{
 		
 	#removes the firstline from the data
 	$data=~s/^$args{set}\n//;
-	#parse the data into the conf
-	$self->{conf}{$args{config}}={parseZML($data)};
-		$self->{set}{$args{config}}=$args{set};
+	
+	#parse the ZML stuff
+	my $zml=ZML->new();
+	$zml->parse($data);
+	if($zml->{error}){
+		warn("ZConf readLDAP:28: ZML->parse error, '".$zml->{error}."', '".$zml->{errorString}."'.");
+		$self->{error}=28;
+		$self->{errorString}="ZConf readLDAP:28: ZML->parse error, '".$zml->{error}."', '".$zml->{errorString}."'.";
+		return undef;
+	};
+	$self->{conf}{$args{config}}={%{$zml->{var}}};
+
+	#sets the loaded config
+	$self->{set}{$args{config}}=$args{set};
 
 	return 1;
 };
@@ -3091,6 +3068,10 @@ Config not loaded.
 =head2 27
 
 Set name is not a legit name.
+
+=head2 28
+
+ZML->parse error.
 
 =head1 ERROR CHECKING
 
