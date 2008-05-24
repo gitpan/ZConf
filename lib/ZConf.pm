@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.0.3
+Version 0.0.4
 
 =cut
 
-our $VERSION = '0.0.3';
+our $VERSION = '0.0.4';
 
 =head1 SYNOPSIS
 
@@ -2720,7 +2720,7 @@ sub writeSetFromLoadedConfig{
 
 	#attempt to sync the set locally if not using the file backend
 	if($self->{args}{backend} ne "file"){
-		my $syncReturn=$self->writeSetFromLoadedConfigFile({config=>$args{config}});
+		my $syncReturn=$self->writeSetFromLoadedConfigFile(\%args);
 		if (!$syncReturn){
 			print "zconf read error: Could not sync config to the loaded config.";
 		};
