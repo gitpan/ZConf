@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.1.5
+Version 0.1.6
 
 =cut
 
-our $VERSION = '0.1.5';
+our $VERSION = '0.1.6';
 
 =head1 SYNOPSIS
 
@@ -1735,12 +1735,13 @@ sub regexVarGet{
 		return undef;
 	};
 
-	my @keys=keys(%{$self->{config}{$config}});
+	my @keys=keys(%{$self->{conf}{$config}});
 
 	my %returnKeys=();
-		
+
 	my $int=0;
 	while(defined($keys[$int])){
+		print "key=".$keys[$int]."\n";
 		if($keys[$int] =~ /$regex/){
 			$returnKeys{$keys[$int]}=$self->{conf}{$config}{$keys[$int]};
 		};
@@ -2804,7 +2805,6 @@ sub writeSetFromLoadedConfigLDAP{
 	#builds the ZML object
 	while(defined($hashkeys[$hashkeysInt])){
 		#attempts to add the variable
-
 		$zml->addVar($hashkeys[$hashkeysInt], 
 					$self->{conf}{$args{config}}{$hashkeys[$hashkeysInt]});
 		#checks to verify there was no error

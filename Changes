@@ -1,5 +1,8 @@
 Revision history for ZConf
 
+0.1.6	2008-05-24/19:16
+		-Fix regexGetVar.
+
 0.1.5	2008-05-24/3:21
 		-Rebump version as the removal of it does constitute a major change.
 
