@@ -1741,7 +1741,6 @@ sub regexVarGet{
 
 	my $int=0;
 	while(defined($keys[$int])){
-		print "key=".$keys[$int]."\n";
 		if($keys[$int] =~ /$regex/){
 			$returnKeys{$keys[$int]}=$self->{conf}{$config}{$keys[$int]};
 		};
