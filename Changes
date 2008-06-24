@@ -1,5 +1,15 @@
 Revision history for ZConf
 
+0.2.0	2008-06-24/2:00
+		-Fix some documentation.
+		-Implement getSubConfig functions.
+
+0.1.8	2008-06-23/14:20
+		-Fix chooseSetFile being used instead of choose for the read part
+		-Fix variable name checking in setVar
+		-Fix error in regexVarDel
+		-Fix issues with the documentation missing ';' in someplaces.
+
 0.1.7	2008-05-24/19:16
 		-Forgot to remove a bit of debugging.
 

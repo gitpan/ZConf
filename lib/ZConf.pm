@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.1.6
+Version 0.2.0
 
 =cut
 
-our $VERSION = '0.1.6';
+our $VERSION = '0.2.0';
 
 =head1 SYNOPSIS
 
@@ -966,7 +966,7 @@ sub getAvailableSetsFile{
 		$self->{error}=14;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."' does not exist.";
 		return undef;
-	};	
+	};
 
 	if(!opendir(CONFIGDIR, $self->{args}{base}."/".$config)){
 		warn("zconf getAvailableSetsFille:15: '".$self->{args}{base}."/".$config."' open failed.");
@@ -993,7 +993,7 @@ sub getAvailableSetsFile{
 		$int++;
 	};
 
-	return @sets; 
+	return @sets;
 };
 
 =head2 getAvailableSetsLDAP
@@ -1080,9 +1080,9 @@ sub getKeys {
 	my ($self, $config) = @_;
 
 	if(!defined($self->{conf}{$config})){
-		warn("zconf getKeys:26: Set '".$config."' is not loaded.");
+		warn("zconf getKeys:26: Config '".$config."' is not loaded.");
 		$self->{error}=26;
-		$self->{errorString}="Set '".$config."' is not loaded.";
+		$self->{errorString}="Config '".$config."' is not loaded.";
 		return undef;
 	};
 
@@ -1119,7 +1119,7 @@ This gets the set for a loaded config.
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
-	
+
 =cut
 
 #get the set a config is currently using
@@ -1135,6 +1135,180 @@ sub getSet{
 	
 	return $self->{set}{$config};
 };
+
+=head2 getSubConfigs
+
+This gets any sub configs for a config. "" can be used to get a list of configs
+under the root.
+
+One arguement is accepted and that is the config to look under.
+
+    #lets assume 'foo/bar' exists, this would return
+    my @subConfigs=$zconf->getSubConfigs("foo");
+    if($zconf->{error}){
+        print "There was some error.\n";
+    }
+
+=cut
+
+#gets the configs under a config
+sub getSubConfigs{
+	my ($self, $config)= @_;
+
+	#blank any previous errors
+	$self->errorBlank;
+
+	#make sure the config name is legit
+	my ($error, $errorString)=$self->configNameCheck($config);
+	if(defined($error)){
+		warn("zconf getSubConfigs:".$error.": ".$errorString);
+		$self->{error}=$error;
+		$self->{errorString}=$errorString;
+		return undef;
+	}
+
+	my @returned;
+
+	#get the sub configs
+	if($self->{args}{backend} eq "file"){
+		@returned=$self->getSubConfigsFile($config);
+	}else{
+		if($self->{args}{backend} eq "ldap"){
+			@returned=$self->getSubConfigsLDAP($config);
+		}
+	}
+
+	return @returned;
+}
+
+=head2 getSubConfigsFile
+
+This gets any sub configs for a config. "" can be used to get a list of configs
+under the root.
+
+One arguement is accepted and that is the config to look under.
+
+    #lets assume 'foo/bar' exists, this would return
+    my @subConfigs=$zconf->getSubConfigs("foo");
+    if($zconf->{error}){
+        print "There was some error.\n";
+    }
+
+=cut
+
+#gets the configs under a config
+sub getSubConfigsFile{
+	my ($self, $config)= @_;
+
+	#returns 0 if the config does not exist
+	if(!-d $self->{args}{base}."/".$config){
+		warn("zconf getSubConfigsFile:14: '".$self->{args}{base}.
+			 "/".$config."' does not exist.");
+		$self->{error}=14;
+		$self->{errorString}="'".$self->{args}{base}."/".$config."' does not exist.";
+		return undef;
+	};
+
+	if(!opendir(CONFIGDIR, $self->{args}{base}."/".$config)){
+		warn("zconf getSubConfigsFile:15: '".$self->{args}{base}."/".$config.
+			 "' open failed.");
+		$self->{error}=15;
+		$self->{errorString}="'".$self->{args}{base}."/".$config."' open failed.";
+		return undef;
+	};
+	my @direntries=readdir(CONFIGDIR);
+	closedir(CONFIGDIR);
+
+	#remove, ""^."" , ""."" , and "".."" from @direntries
+	@direntries=grep(!/^\./, @direntries);
+	@direntries=grep(!/^\.\.$/, @direntries);
+	@direntries=grep(!/^\.$/, @direntries);
+
+	my @sets=();
+
+	#go though the list and return only files
+	my $int=0;
+	while(defined($direntries[$int])){
+		if(-d $self->{args}{base}."/".$config."/".$direntries[$int]){
+			push(@sets, $direntries[$int]);
+		};
+		$int++;
+	};
+
+	return @sets;
+}
+
+=head2 getSubConfigsLDAP
+
+This gets any sub configs for a config. "" can be used to get a list of configs
+under the root.
+
+One arguement is accepted and that is the config to look under.
+
+    #lets assume 'foo/bar' exists, this would return
+    my @subConfigs=$zconf->getSubConfigs("foo");
+    if($zconf->{error}){
+        print "There was some error.\n";
+    }
+
+=cut
+
+#gets the configs under a config
+sub getSubConfigsLDAP{
+	my ($self, $config)= @_;
+		
+	#connects up to LDAP
+	my $ldap;
+	eval {
+   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
+				bindDN => $self->{args}{"ldap/bind"},
+				bindpw => $self->{args}{"ldap/password"},
+				base   => $self->{args}{"ldap/homeDN"},
+				searchattrs => [qw(dn)]);
+	};
+	if($@){
+		warn("zconf getSubConfigsLDAP:1: LDAP connection failed with '".$@."'.");
+		$self->{error}=1;
+		$self->{errorString}="LDAP connection failed with '".$@."'";
+		return undef;
+	};
+
+	my $dn;
+	#converts the config name to a DN
+	if ($config eq "") {
+		#this is done as using config2dn results in an error
+		$dn=$self->{args}{"ldap/base"};
+	}else{
+		$dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
+	}
+
+	#searches and builds hash of the return
+	my $ldapmesg=$ldap->search(scope=>"one", base=>$dn,filter => "(objectClass=*)");
+	my %hashedmesg=LDAPhash($ldapmesg);
+
+	#
+	my @keys=keys(%hashedmesg);
+
+	#holds the returned sets
+	my @sets;
+
+	my $keysInt=0;
+	while ($keys[$keysInt]){
+		#only process ones that start with 'cn='
+		if ($keys[$keysInt] =~ /^cn=/) {
+			#remove the begining config DN chunk
+			$keys[$keysInt]=~s/,$dn$//;
+			#removes the cn= at the begining
+			$keys[$keysInt]=~s/^cn=//;
+			#push the processed key onto @sets
+			push(@sets, $keys[$keysInt]);
+	    }
+		
+		$keysInt++;
+	}
+
+	return @sets;
+}
 
 =head2 read
 
@@ -1191,7 +1365,7 @@ sub read{
 
 	#gets the set to use if not set
 	if(!defined($args{set})){
-		$args{set}=$self->chooseFileSet($args{config});
+		$args{set}=$self->chooseSet($args{config});
 
 		#do something if the choosen does not exist
 		if(! -f $self->{args}{base}."/".$args{config}."/".$args{set}){
@@ -1530,11 +1704,11 @@ sub readChooser{
 This functions just like readChooser, but functions on the file backend
 and only really intended for internal use.
 
-	my $chooser = $zconf->readChooserFile("foo/bar")
+	my $chooser = $zconf->readChooserFile("foo/bar");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
-	
+
 =cut
 
 #this gets the chooser for a the config... for the file backend
@@ -1592,11 +1766,11 @@ sub readChooserFile{
 This functions just like readChooser, but functions on the LDAP backend
 and only really intended for internal use.
 
-	my $chooser = $zconf->readChooserLDAP("foo/bar")
+	my $chooser = $zconf->readChooserLDAP("foo/bar");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
-	
+
 =cut
 
 #this gets the chooser for a the config... for the file backend
@@ -1672,7 +1846,7 @@ Two arguements are required. The first is the config to search. The second
 is the regular expression to use.
 
 	#removes any variable starting with the monkey
-	my @deleted = $zconf->regexVarDel("foo/bar", "^monkey")
+	my @deleted = $zconf->regexVarDel("foo/bar", "^monkey");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -1690,14 +1864,14 @@ sub regexVarDel{
 		return undef;
 	};
 
-	my @keys=keys(%{$self->{config}{$config}});
+	my @keys=keys(%{$self->{conf}{$config}});
 
 	my @returnKeys=();
 
 	my $int=0;
 	while(defined($keys[$int])){
 		if($keys[$int] =~ /$regex/){
-			delete($self->{config}{$config}{$keys[$int]});
+			delete($self->{conf}{$config}{$keys[$int]});
 			push(@returnKeys, $keys[$int]);
 		};
 
@@ -1716,7 +1890,7 @@ Two arguements are required. The first is the config to search. The second
 is the regular expression to use.
 
 	#returns any variable begining with monkey
-	my %vars = $zconf->regexVarGet("foo/bar", "^monkey")
+	my %vars = $zconf->regexVarGet("foo/bar", "^monkey");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -1884,12 +2058,12 @@ This sets a variable in a loaded config.
 Three arguements are required. The first is the name of the config.
 The second is the name of the variable. The third is the value.
 
-	if(!$zconf->setDefault("foo/bar" , "something", "eat more weazel\n\nor something")){
+	if(!$zconf->setVar("foo/bar" , "something", "eat more weazel\n\nor something")){
 		print "A error occured when trying to set a variable.\n";
 	};
 
 	#sets what the default set is
-	my $returned = $zconf->setDefault("foo/bar" , "something", "eat more weazel\n\nor something"
+	my $returned = $zconf->setVar("foo/bar" , "something", "eat more weazel\n\nor something"
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -1901,6 +2075,9 @@ The second is the name of the variable. The third is the value.
 sub setVar{
 	my ($self, $config, $var, $value) = @_;
 
+	#blank the any previous errors
+	$self->errorBlank;
+
 	#make sure the config name is legit
 	my ($error, $errorString)=$self->configNameCheck($config);
 	if(defined($error)){
@@ -1911,7 +2088,7 @@ sub setVar{
 	};
 
 	#make sure the config name is legit
-	($error, $errorString)=$self->varNameCheck($config);
+	($error, $errorString)=$self->varNameCheck($var);
 	if(defined($error)){
 		warn("zconf setVar:12:".$error.": ".$errorString);
 		$self->{error}=$error;
@@ -2634,7 +2811,7 @@ be written out to a set. 'set' is a optional key that represents
 set the config will be written to. If there is not set defined,
 the current set will be used.
 
-	if(!$zconf->writeSetFromLoadedConfig({config="foo/bar"})){
+	if(!$zconf->writeSetFromLoadedConfig({config=>"foo/bar"})){
 		print "it failed\n";
 	};
 
@@ -2712,7 +2889,7 @@ This is a internal only function. No checking is done on the arguements
 as that is done in writeSetFromLoadedConfig. This provides the file
 backend for writeSetFromLoadedConfig.
 
-	if(!$zconf->writeSetFromLoadedConfigFile({config="foo/bar"})){
+	if(!$zconf->writeSetFromLoadedConfigFile({config=>"foo/bar"})){
 		print "it failed\n";
 	};
 
@@ -2777,7 +2954,7 @@ This is a internal only function. No checking is done on the arguements
 as that is done in writeSetFromLoadedConfig. This provides the LDAP
 backend for writeSetFromLoadedConfig.
 
-	if(!$zconf->writeSetFromLoadedConfigLDAP({config="foo/bar"})){
+	if(!$zconf->writeSetFromLoadedConfigLDAP({config=>"foo/bar"})){
 		print "it failed\n";
 	};
 
