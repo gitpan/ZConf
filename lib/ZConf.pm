@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.2.0
+Version 0.3.0
 
 =cut
 
-our $VERSION = '0.2.0';
+our $VERSION = '0.3.0';
 
 =head1 SYNOPSIS
 
@@ -46,9 +46,13 @@ is returned. The hash can contain various initization options.
 
 When it is run for the first time, it creates a filesystem only config file.
 
+=over
+
 =item file
 
 The default is 'xdf_config_home/zconf.zml', which is generally '~/.config/zconf.zml'.
+
+=back
 
 =cut
 
@@ -873,6 +877,43 @@ sub createConfigLDAP{
 	return 1;
 };
 
+=head2 defaultSetExists
+
+This checks to if the default set for a config exists. It takes one arguement,
+which is the name of the config. The returned value is a Perl boolean.
+
+=cut
+
+sub defaultSetExists{
+	my $self=$_[0];
+	my $config=$_[1];
+
+	$self->errorBlank();
+
+	#make sure the config name is legit
+	my ($error, $errorString)=$self->configNameCheck($config);
+	if(defined($error)){
+		warn("ZConf defaultSetExists:".$error.": ".$errorString);
+		$self->{error}=$error;
+		$self->{errorString}=$errorString;
+		return undef;
+	};
+
+	#makes sure it exists
+	if (!$self->configExists($config)){
+		warn('ZConf defaultSetExists:12: The specified config, "'.$config.'" does not exist');
+		return undef;
+	}
+
+	#figures out what to use for the set
+	my $set=$self->chooseSet($config);
+	if (defined($self->{error})){
+		return undef;
+	}
+
+	return 1;
+}
+
 =head2 errorBlank
 
 This blanks the error storage and is only meant to not meant to be called.
@@ -900,7 +941,7 @@ This gets the available sets for a config.
 
 The only arguement is the name of the configuration in question.
 
-	my @sets = $zconf->getAvailableSets("foo/bar")
+	my @sets = $zconf->getAvailableSets("foo/bar");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -949,7 +990,7 @@ sub getAvailableSets{
 This is exactly the same as getAvailableSets, but for the file back end.
 For the most part it is not intended to be called directly.
 
-	my @sets = $zconf->getAvailableSetsFile("foo/bar")
+	my @sets = $zconf->getAvailableSetsFile("foo/bar");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -1001,7 +1042,7 @@ sub getAvailableSetsFile{
 This is exactly the same as getAvailableSets, but for the file back end.
 For the most part it is not intended to be called directly.
 
-	my @sets = $zconf->getAvailableSetsLDAP("foo/bar")
+	my @sets = $zconf->getAvailableSetsLDAP("foo/bar");
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -2115,6 +2156,44 @@ sub setVar{
 	return 1;
 };
 
+=head2 unloadConfig
+
+Unloads a specified configuration. The only required value is the
+set name. The return value is a Perl boolean value.
+
+    if(!$zconf->unloadConfig($config)){
+        print "error: ".$zconf->{error}."\n";
+    }
+
+=cut
+
+sub unloadConfig{
+	my $self=$_[0];
+	my $config=$_[1];
+
+	$self->errorBlank();
+
+	if (!defined($self->{conf}{$config})){
+		warn('ZConf:26: The specified config, ".$config.", is not loaded');
+		$self->{error}=26;
+		$self->{errorString}='The specified config, ".$config.", is not loaded';
+		#even if it is not defined, check to see if this is defined and remove it
+		if (defined($self->{set}{$config})){
+			undef($self->{set}{$config});
+		}
+		return undef;
+	}else {
+		undef($self->{conf}{$config});
+	}
+
+	#removes the loaded set information
+	if (defined($self->{set}{$config})){
+		undef($self->{set}{$config});
+	}
+
+	return 1;
+}
+
 =head2 varNameCheck
 
 	my ($error, $errorString) = $zconf->varNameCheck($config);
@@ -2133,7 +2212,7 @@ sub varNameCheck{
         if($name =~ /,/){
                 return("0", "variavble name,'".$name."', contains ','");
         };
-                
+
         #checks for /.
         if($name =~ /\/\./){
                 return("1", "variavble name,'".$name."', contains '/.'");
@@ -2635,7 +2714,7 @@ writeSetFromHash, but functions just on the LDAP backend.
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
-	
+
 =cut
 
 #write out a config from a hash to the LDAP backend
@@ -3337,7 +3416,6 @@ This is the password to use for when connecting to the server.
 	#    .1 zconfChooser
 	#    .2 zconfSet
 	
-	#zmsServerPassword
 	attributeType ( 1.3.6.1.4.1.26481.2.7.0
 		NAME 'zconfData'
 		DESC 'Data attribute for a zconf entry.'
@@ -3359,7 +3437,6 @@ This is the password to use for when connecting to the server.
 		EQUALITY caseExactMatch
 		)
 
-	#zmsServerProfile
 	objectclass ( 1.3.6.1.4.1.26481.2.7
 		NAME 'zconf'
 		DESC 'A zconf entry.'

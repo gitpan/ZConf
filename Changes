@@ -1,5 +1,13 @@
 Revision history for ZConf
 
+0.3.1	2008-07-12/19:20
+		-Fully implement and document defaultSetExists.
+
+0.3.0	2008-07-12/18:55
+		-Add a few missing ';'s in the POD
+		-Remove stray comments in the LDAP schema.
+		-Added unloadConfig function.
+
 0.2.0	2008-06-24/2:00
 		-Fix some documentation.
 		-Implement getSubConfig functions.
