@@ -17,7 +17,7 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.3.0
+Version 0.3.1
 
 =cut
 
@@ -916,7 +916,7 @@ sub defaultSetExists{
 
 =head2 errorBlank
 
-This blanks the error storage and is only meant to not meant to be called.
+This blanks the error storage and is only meant for internal usage.
 
 It does the following.
 
@@ -1449,7 +1449,7 @@ sub read{
 			print "zconf read error: Could not sync config to the loaded config.";
 		};
 	};
-		
+
 	return 1;
 };
 
@@ -1512,7 +1512,7 @@ sub readFile{
 	close("thefile");
 
 	#at this point we add
-	$self->{config}{$args{config}}={};
+	$self->{conf}{$args{config}}={};
 
 	my $rawdataInt=0;
 	my $prevVar=undef;
@@ -1523,14 +1523,14 @@ sub readFile{
 				chomp($rawdata[$rawdataInt]);
 				$rawdata[$rawdataInt]=~s/^ //;#remove the trailing space
 				#add in the line return and 
-				$self->{config}{$args{config}}{$prevVar}=
-					$self->{config}{$args{config}}{$prevVar}."\n".$rawdata[$rawdataInt];
+				$self->{conf}{$args{config}}{$prevVar}=
+					$self->{conf}{$args{config}}{$prevVar}."\n".$rawdata[$rawdataInt];
 			};
 		}else{
 			#split it into two
 			my @linesplit=split(/=/, $rawdata[$rawdataInt], 2);
 			chomp($linesplit[1]);
-			$self->{config}{$args{config}}{$linesplit[0]}=$linesplit[1];
+			$self->{conf}{$args{config}}{$linesplit[0]}=$linesplit[1];
 			$prevVar=$linesplit[0];#this is used if the next line is a continuation from the previous
 		};
 
