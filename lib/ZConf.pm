@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.3.1
+Version 0.4.0
 
 =cut
 
-our $VERSION = '0.3.0';
+our $VERSION = '0.4.0';
 
 =head1 SYNOPSIS
 
@@ -501,7 +501,7 @@ The returned value is a perl boolean value.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->configExists("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -553,7 +553,7 @@ as that is done in configExists. The same is true for calling errorBlank.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->configExistsFile("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -648,7 +648,7 @@ sub configNameCheck{
 
 	#checks for undef
 	if(!defined($name)){
-		
+		return("11", "config name is not defined.");
 	};
 
 	#checks for ,
@@ -696,7 +696,7 @@ sub configNameCheck{
 		return("10", "config name,'".$name."', matched /\\n/");
 	};
 
-	return(undef, ""); 
+	return(undef, "");
 };
 
 =head2 createConfig
@@ -713,7 +713,7 @@ The returned value is a perl boolean.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->createConfig("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -774,7 +774,7 @@ is not checked to see if it is legit or not.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->createConfigFile("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -822,7 +822,7 @@ is not checked to see if it is legit or not.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->createConfigLDAP("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -914,6 +914,268 @@ sub defaultSetExists{
 	return 1;
 }
 
+=head2 delSet
+
+This deletes a specified set.
+
+Two arguements are required. The first one is the name of the config and the and
+the second is the name of the set.
+
+    if(!$zconf->delSet("foo/bar", "someset")){
+        print "delSet failed\n";
+    }
+    
+    #does the same, but using the zconf error reporting method
+    $zconf->delSetFile("foo/bar", "someset";
+    if(defined($zconf->{error})){
+        print "delSet failed\n";
+    }
+
+=cut
+
+sub delSet{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $set=$_[2];
+	
+	$self->errorBlank;
+	
+	#return if no set is given
+	if (!defined($set)){
+		warn("zconf delSet:24: \$set is not defined");
+		$self->{error}=24;
+		$self->{errorString}='$set not defined';
+		return undef;
+	};
+
+	#return if no config is given
+	if (!defined($config)){
+		warn("zconf delSet:25: \$config is not defined");
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		return undef;
+	}
+
+	#makes sure it exists before continuing
+	#This will also make sure the config exists.
+	my $returned = $self->configExists($config);
+	if (defined($self->{error})){
+		warn('ZConf delSet:12: The config "'.$config.'" does not exist');
+		return undef;
+	}
+
+	#
+	if($self->{args}{backend} eq "file"){
+		$returned=$self->delSetFile($config, $set);
+	}else{
+		if($self->{args}{backend} eq "ldap"){
+			$returned=$self->delSetLDAP($config, $set);
+		}
+	}
+
+	if (!$self->{args}{backend} eq "file") {
+		$returned=$self->delSetFile($config, $set);
+	}
+
+	return $returned;
+}
+
+=head2 delSetFile
+
+This deletes a specified set, for the filesystem backend.
+
+Two arguements are required. The first one is the name of the config and the and
+the second is the name of the set.
+
+    if(!$zconf->delSetFile("foo/bar", "someset")){
+        print "delSet failed\n";
+    }
+    
+    #does the same, but using the zconf error reporting method
+    $zconf->delSetFile("foo/bar", "someset";
+    if(defined($zconf->{error})){
+        print "delSet failed\n";
+    }
+
+=cut
+
+sub delSetFile{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $set=$_[2];
+
+	$self->errorBlank;
+
+	#return if no set is given
+	if (!defined($set)){
+		warn("zconf delSetFile:24: \$set is not defined");
+		$self->{error}=24;
+		$self->{errorString}='$set not defined';
+		return undef;
+	}
+
+	#return if no config is given
+	if (!defined($config)){
+		warn("zconf delSetFile:25: \$config is not defined");
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		return undef;
+	}
+
+	#the path to the config
+	my $configpath=$self->{args}{base}."/".$config;
+
+	#returns with an error if it could not be set
+	if (!-d $configpath) {
+		warn('zconf delSetFile:14: "'.$config.'" is not a directory or does not exist');
+		$self->{error}=14;
+		$self->{errorString}='"'.$config.'" is not a directory or does not exist';
+		return undef;
+	}
+	
+	#the path to the set
+	my $fullpath=$configpath."/".$set;
+
+#not doing thie right now as I figure it is best just to delete the file and see if it goes or not
+#	if (!-f $fullpath) {
+#		warn('zconf delSetFile:14: "'.$filepath.'" is not a file or does not exist');
+#		$self->{error}=14;
+#		$self->{errorString}='"'.$filepath.'" is not a file or does not exist';
+#	}
+
+	if (!unlink($fullpath)) {
+		warn('zconf delSetFile:14: "'.$fullpath.'" could not be unlinked');
+		$self->{error}=29;
+		$self->{errorString}='"'.$fullpath.'" could not be unlinked.';
+		return undef;
+	}
+
+	return 1;
+}
+
+=head2 delSetLDAP
+
+This deletes a specified set, for the LDAP backend.
+
+Two arguements are required. The first one is the name of the config and the and
+the second is the name of the set.
+
+    if(!$zconf->delSetLDAP("foo/bar", "someset")){
+        print "delSet failed\n";
+    }
+    
+    #does the same, but using the zconf error reporting method
+    $zconf->delSetLDAP("foo/bar", "someset";
+    if(defined($zconf->{error})){
+        print "delSet failed\n";
+    }
+
+
+=cut
+
+sub delSetLDAP{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $set=$_[2];
+
+	$self->errorBlank;
+
+	#return if no config is given
+	if (!defined($config)){
+		warn("zconf delSet:25: \$config is not defined");
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		return undef;
+	}
+
+	#connects up to LDAP
+	my $ldap;
+	eval {
+   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
+				bindDN => $self->{args}{"ldap/bind"},
+				bindpw => $self->{args}{"ldap/password"},
+				base   => $self->{args}{"ldap/homeDN"},
+				searchattrs => [qw(dn)]);
+	};
+	if($@){
+		warn("zconf writeChooserLDAP:1: LDAP connection failed with '".$@."'.");
+		$self->{error}=1;
+		$self->{errorString}="LDAP connection failed with '".$@."'";
+		return undef;
+	};
+
+	#creates the DN from the config
+	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
+
+	#makes sure it exists and the return is the expected one
+	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+	my $entry=$ldapmesg->entry;
+	if(!defined($entry->dn())){
+		warn("zconf writeChooserLDAP:13: Expected DN, '".$dn."' not found.");
+		$self->{error}=13;
+		$self->{errorString}="Expected DN, '".$dn."' not found.";
+		return undef;
+	}else{
+		if($entry->dn ne $dn){
+			warn("zconf writeChooserLDAP:13: Expected DN, '".$dn."' not found.");
+			$self->{error}=13;
+			$self->{errorString}="Expected DN, '".$dn."' not found.";
+			return undef;				
+		};
+	};
+		
+	#makes sure the zconfSet attribute is set for the config in question
+	my @attributes=$entry->get_value('zconfSet');
+	#if the 0th is not defined, it means this config does not have any sets or it is wrong
+	if(defined($attributes[0])){
+		#if $attributes dues contain enteries, make sure that one of them is the proper set
+		my $attributesInt=0;
+		my $setFound=0;#set to one if the loop finds the set
+		while(defined($attributes[$attributesInt])){
+			if($attributes[$attributesInt] eq $set){
+				$setFound=1;
+				print "set found\n";
+				$entry->delete(zconfSet=>[$attributes[$attributesInt]]);
+			};
+			$attributesInt++;
+		};
+	};
+
+	#
+	@attributes=$entry->get_value('zconfData');
+	#if the 0th is not defined, it means there are no sets
+	if(defined($attributes[0])){
+		#if $attributes dues contain enteries, make sure that one of them is the proper set
+		my $attributesInt=0;
+		my $setFound=undef;#set to one if the loop finds the set
+		while(defined($attributes[$attributesInt])){
+			if($attributes[$attributesInt] =~ /^$set\n/){
+				$setFound=1;
+				$entry->delete(zconfData=>[$attributes[$attributesInt]]);
+				print "data found\n";
+			};
+			$attributesInt++;
+		};
+		#if the config is not found, add it
+		if(!$setFound){
+			warn('zconf delSetLDAP:25: The specified set, "'.$set.'" was not found for "'.$config.'".');
+			$self->{error}=31;
+			$self->{errorString}='The specified set, "'.$set.'" was not found for "'.$config.'".';
+			return undef;
+		};
+	}else{
+		warn('zconf delSetLDAP:25: No zconfData attributes exist for "'.$dn.'" and thus no sets exist.');
+		$self->{error}=30;
+		$self->{errorString}='No zconfData attributes exist for "'.$dn.'" and thus no sets exist.';
+		return undef;
+	}
+
+	#write the entry to LDAP
+	my $results=$entry->update($ldap);
+
+	return 1;
+}
+
 =head2 errorBlank
 
 This blanks the error storage and is only meant for internal usage.
@@ -942,7 +1204,7 @@ This gets the available sets for a config.
 The only arguement is the name of the configuration in question.
 
 	my @sets = $zconf->getAvailableSets("foo/bar");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -991,7 +1253,7 @@ This is exactly the same as getAvailableSets, but for the file back end.
 For the most part it is not intended to be called directly.
 
 	my @sets = $zconf->getAvailableSetsFile("foo/bar");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1043,7 +1305,7 @@ This is exactly the same as getAvailableSets, but for the file back end.
 For the most part it is not intended to be called directly.
 
 	my @sets = $zconf->getAvailableSetsLDAP("foo/bar");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1110,7 +1372,7 @@ sub getDefault{
 This gets gets the keys for a loaded config.
 
 	my @keys = $zconf->getKeys("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1157,7 +1419,7 @@ sub getLoadedConfigs {
 This gets the set for a loaded config.
 
 	my $set = $zconf->getSet("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1186,7 +1448,7 @@ One arguement is accepted and that is the config to look under.
 
     #lets assume 'foo/bar' exists, this would return
     my @subConfigs=$zconf->getSubConfigs("foo");
-    if($zconf->{error}){
+    if(defined($zconf->{error})){
         print "There was some error.\n";
     }
 
@@ -1231,7 +1493,7 @@ One arguement is accepted and that is the config to look under.
 
     #lets assume 'foo/bar' exists, this would return
     my @subConfigs=$zconf->getSubConfigs("foo");
-    if($zconf->{error}){
+    if(defined($zconf->{error})){
         print "There was some error.\n";
     }
 
@@ -1288,7 +1550,7 @@ One arguement is accepted and that is the config to look under.
 
     #lets assume 'foo/bar' exists, this would return
     my @subConfigs=$zconf->getSubConfigs("foo");
-    if($zconf->{error}){
+    if(defined($zconf->{error})){
         print "There was some error.\n";
     }
 
@@ -1366,7 +1628,7 @@ automatically choosen one.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->read({config=>"foo/bar"})
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1464,7 +1726,7 @@ only. This reads the config from the file backend.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->readFile({config=>"foo/bar"})
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1554,7 +1816,7 @@ only. This reads the config from the LDAP backend.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->readLDAP({config=>"foo/bar"})
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1645,7 +1907,7 @@ sub readLDAP{
 		warn("zconf readLDAP:13: No matching sets found in '".$args{config}."'.");
 		$self->{error}=13;
 		$self->{errorString}="No matching sets found in '".$args{config}."'.";
-		return undef;			
+		return undef;	
 	};
 	
 		
@@ -1676,7 +1938,7 @@ This reads the chooser for a config. If no chooser is defined "" is returned.
 The name of the config is the only required arguement.
 
 	my $chooser = $zconf->readChooser("foo/bar")
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1746,7 +2008,7 @@ This functions just like readChooser, but functions on the file backend
 and only really intended for internal use.
 
 	my $chooser = $zconf->readChooserFile("foo/bar");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1808,7 +2070,7 @@ This functions just like readChooser, but functions on the LDAP backend
 and only really intended for internal use.
 
 	my $chooser = $zconf->readChooserLDAP("foo/bar");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1888,7 +2150,7 @@ is the regular expression to use.
 
 	#removes any variable starting with the monkey
 	my @deleted = $zconf->regexVarDel("foo/bar", "^monkey");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1932,7 +2194,7 @@ is the regular expression to use.
 
 	#returns any variable begining with monkey
 	my %vars = $zconf->regexVarGet("foo/bar", "^monkey");
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -1976,7 +2238,7 @@ is the regular expression to use.
 
 	#removes any variable starting with the monkey
 	my @matched = $zconf->regexVarSearch("foo/bar", "^monkey")
-	if($zconf->{error}){
+	if($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -2029,6 +2291,9 @@ This sets the default set to use if one is not specified or choosen.
 sub setDefault{
 	my ($self, $set)= @_;
 
+	#blank any errors
+	$self->errorBlank;
+
 	if($self->setNameLegit($set)){
 		$self->{args}{default}=$set;
 	}else{
@@ -2040,6 +2305,59 @@ sub setDefault{
 
 	return 1;
 };
+
+=head2 setExists
+
+This checks if the specified set exists.
+
+Two arguements are required. The first arguement is the name of the config.
+The second arguement is the name of the set.
+
+    if($zconf->setExists("foo/bar", "fubar")){
+        print "It exists.\n";
+    }
+
+    #the same, but using error checking as well
+    my $return=$zconf->setExists("foo/bar", "fubar");
+    if(defined($zconf->{error})){
+        print "Error!\n";
+    }else{
+        if($return){
+            print "It exists.\n";
+        }
+    }
+
+=cut
+
+sub setExists{
+	my ($self, $config, $set)= @_;
+
+	#blank any errors
+	$self->errorBlank;
+
+	#We don't do any config name checking here or even if it exists as getAvailableSets
+	#will do that.
+
+	my @sets = $self->getAvailableSets($config);
+	if (defined($self->{error})) {
+		return undef;
+	}
+
+
+	my $setsInt=0;#used for intering through $sets
+	#go through @sets and check for matches
+	while (defined($sets[$setsInt])) {
+		#return true if the current one matches
+		if ($sets[$setsInt] eq $set) {
+			return 1;
+		}
+
+		$setsInt++;
+	}
+
+	#if we get here, it means it was not found in the loop
+	return undef;
+}
 
 =head2 setNameLegit
 
@@ -2208,6 +2526,11 @@ sub unloadConfig{
 sub varNameCheck{
         my ($self, $name) = @_;
 
+		#makes sure it is defined
+		if (!defined($name)) {
+			return('10', 'variable name is not defined');
+		};
+
         #checks for ,
         if($name =~ /,/){
                 return("0", "variavble name,'".$name."', contains ','");
@@ -2253,7 +2576,7 @@ sub varNameCheck{
                 return("8", "variavble name,'".$name."', matched /\\n/");
         };
 
-        #checks for 
+        #checks for =
         if($name =~ /=/){
                 return("9", "variavble name,'".$name."', matched /=/");
         };
@@ -2277,7 +2600,7 @@ No error checking is done currently on the chooser string.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->writeChooser("foo/bar", $chooserString)
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -2429,7 +2752,7 @@ writeChooser, which it functions the same as. It works on the LDAP backend.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->writeChooserLDAP("foo/bar", $chooserString)
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -2538,7 +2861,7 @@ The second hash is the hash to be written to the config.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->writeSetFromHash({config=>"foo/bar"}, %hash)
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -2711,7 +3034,7 @@ writeSetFromHash, but functions just on the LDAP backend.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->writeSetFromHashLDAP({config=>"foo/bar"}, %hash)
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -2896,7 +3219,7 @@ the current set will be used.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->writeSetFromLoadedConfig({config=>"foo/bar"}, %hash)
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -3039,7 +3362,7 @@ backend for writeSetFromLoadedConfig.
 
 	#does the same thing above, but using the error interface
 	my $returned = $zconf->writeSetFromLoadedConfigLDAP({config=>"foo/bar"}, %hash)
-	if($zconf->{error}){
+	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
 
@@ -3328,6 +3651,18 @@ Set name is not a legit name.
 
 ZML->parse error.
 
+=head2 29
+
+Could not unlink the unlink the set.
+
+=head2 30
+
+The sets exist for the specified config.
+
+=head2 31
+
+Did not find a matching set.
+
 =head1 ERROR CHECKING
 
 This can be done by checking $zconf->{error} to see if it is defined. If it is defined,
@@ -3358,7 +3693,12 @@ This is contains the error code if there is an error. It is undefined when none 
 
 =head2 errorString
 
-This contains a description of the error when one is present. When one is not present it is "".  
+This contains a description of the error when one is present. When one is not present it is "".
+
+=head2 set
+
+This contains a hash, whose keys are the name of the loaded configs. The value of each key
+is the name of the loaded set for that config.
 
 =head1 zconf.zml
 

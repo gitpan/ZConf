@@ -1,5 +1,11 @@
 Revision history for ZConf
 
+0.4.0	2008-09-19/19:30
+		-Add delSet, delSetFile, delSetLDAP, and setExists.
+		-Make sure setDefault blanks errors.
+		-Document the internal hash 'set'.
+		-The name checks now check for undefined ones as well.
+
 0.3.2	2008-07-22/19:15
 		-Fix a major error with readFile.
 
