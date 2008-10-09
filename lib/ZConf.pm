@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.4.0
+Version 0.5.0
 
 =cut
 
-our $VERSION = '0.4.0';
+our $VERSION = '0.5.0';
 
 =head1 SYNOPSIS
 
@@ -341,6 +341,8 @@ It takes one arguement, which is the configuration it is for.
 sub chooseSet{
 	my ($self, $config) = @_;
 
+	$self->errorBlank;
+
 	my ($error, $errorString)=$self->configNameCheck($config);
 	if(defined($error)){
 		warn("zconf chooseSet:".$error.": ".$errorString);
@@ -348,8 +350,6 @@ sub chooseSet{
 		$self->{errorString}=$errorString;
 		return undef;
 	};
-
-	$self->errorBlank;
 
 	my $returned=undef;
 
@@ -458,6 +458,10 @@ sub config2dn(){
 	my $config=$_[1];
 
 	$self->errorBlank;
+
+	if ($config eq '') {
+		return '';
+	}
 
 	my ($error, $errorString)=$self->configNameCheck($config);
 	if(defined($error)){
@@ -588,38 +592,28 @@ as that is done in configExists. The same is true for calling errorBlank.
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
-	
+
 =cut
 
 #check if a LDAP config exists
 sub configExistsLDAP{
 	my ($self, $config) = @_;
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf createLDAPConfig: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
-	my $dn=$self->config2dn($config);	
-	$dn=$dn.",".$self->{args}{"ldap/base"};
-
 	my @lastitemA=split(/\//, $config);
 	my $lastitem=$lastitemA[$#lastitemA];
 
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+	#gets the LDAP message
+	my $ldapmesg=$self->LDAPgetConfMessage($config);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	my %hashedmesg=LDAPhash($ldapmesg);
-	$ldap->unbind;
+#	$ldap->unbind;
+	my $dn=$self->config2dn($config);
+	$dn=$dn.",".$self->{args}{"ldap/base"};
+
 	if(!defined($hashedmesg{$dn})){
 		return undef;
 	};
@@ -832,29 +826,26 @@ is not checked to see if it is legit or not.
 sub createConfigLDAP{
 	my ($self, $config) = @_;
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf createLDAPConfig: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#converts the config name to a DN
 	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
 
 	my @lastitemA=split(/\//, $config);
 	my $lastitem=$lastitemA[$#lastitemA];
 
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+	#connects up to LDAP
+	my $ldap=$self->LDAPconnect();
+	if (defined($self->{error})) {
+		warn('zconf createConfigLDAP: LDAPconnect errored... returning');
+		return undef;
+	}
+
+	#gets the LDAP message
+	my $ldapmesg=$self->LDAPgetConfMessage($config, $ldap);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	my %hashedmesg=LDAPhash($ldapmesg);
 	if(!defined($hashedmesg{$dn})){
 		my $path=$config; #used with for with LDAPmakepathSimple
@@ -876,6 +867,8 @@ sub createConfigLDAP{
 	};
 	return 1;
 };
+
+
 
 =head2 defaultSetExists
 
@@ -908,6 +901,197 @@ sub defaultSetExists{
 	#figures out what to use for the set
 	my $set=$self->chooseSet($config);
 	if (defined($self->{error})){
+		return undef;
+	}
+
+	return 1;
+}
+
+=head2 delConfig
+
+This removes a config. Any sub configs will need to removes first. If any are
+present, this function will error.
+
+    #removes 'foo/bar'
+    $zconf->delConfig('foo/bar');
+    if(defined($zconf->{error})){
+        print 'error!';
+    }
+
+=cut
+
+sub delConfig{
+	my $self=$_[0];
+	my $config=$_[1];
+
+	$self->errorBlank;
+	
+	#return if no set is given
+	if (!defined($config)){
+		warn("zconf delConfig:25: \$config is not defined");
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		return undef;
+	};
+
+	#makes sure no subconfigs exist
+	my @subs=$self->getSubConfigs($config);
+	#return if this can't be completed
+	if (defined($self->{error})) {
+		return undef;		
+	}
+	if (defined($subs[0])) {
+		warn('ZConf delConfig:33: Could not remove the config as it has sub configs');
+		$self->{error}=33;
+		$self->{errorString}='Could not remove the config as it has sub configs.';
+		return undef;
+	}
+
+	#do it
+	my $returned;
+	if($self->{args}{backend} eq "file"){
+		$returned=$self->delConfigFile($config);
+	}else{
+		if($self->{args}{backend} eq "ldap"){
+			$returned=$self->delConfigLDAP($config);
+		}
+	}
+
+	if (!$self->{args}{backend} eq "file") {
+		$returned=$self->delSetFile($config);
+	}
+
+	return $returned;
+}
+
+=head2 delConfigFile
+
+This removes a config. Any sub configs will need to removes first. If any are
+present, this function will error.
+
+    #removes 'foo/bar'
+    $zconf->delConfig('foo/bar');
+    if(defined($zconf->{error})){
+        print 'error!';
+    }
+
+=cut
+
+sub delConfigFile{
+	my $self=$_[0];
+	my $config=$_[1];
+
+	#return if this can't be completed
+	if (defined($self->{error})) {
+		return undef;		
+	}
+
+	my @subs=$self->getSubConfigsFile($config);
+	#return if there are any sub configs
+	if (defined($subs[0])) {
+		warn('zconf delConfigFile:33: Could not remove the config as it has sub configs');
+		$self->{error}='33';
+		$self->{errorString}='Could not remove the config as it has sub configs';
+		return undef;
+	}
+
+	#makes sure it exists before continuing
+	#This will also make sure the config exists.
+	my $returned = $self->configExistsFile($config);
+	if (defined($self->{error})){
+		warn('ZConf delConfigFile:12: The config, "'.$config.'", does not exist');
+		$self->{error}='12';
+		$self->{errorString}='The config, "'.$config.'", does not exist';
+		return undef;
+	}
+
+	my @sets=$self->getAvailableSets($config);
+	if (defined($self->{error})) {
+		warn('zconf delConfigFile: getAvailableSets set an error');
+		return undef;
+	}
+
+	#goes through and removes each set before deleting
+	my $setsInt='0';#used for intering through @sets
+	while (defined($sets[$setsInt])) {
+		#removes a set
+		$self->delSetFile($config, $sets[$setsInt]);
+		if ($self->{error}) {
+			warn('zconf delConfigFile: delSetFileset an error');
+			return undef;
+		}
+		$setsInt++;
+	}
+
+	#the path to the config
+	my $configpath=$self->{args}{base}."/".$config;
+
+	if (!unlink($configpath)) {
+		warn('zconf delConfigFile:29: "'.$configpath.'" could not be unlinked');
+		$self->{error}=29;
+		$self->{errorString}='"'.$configpath.'" could not be unlinked.';
+		return undef;
+	}
+
+	return 1;
+}
+
+=head2 delConfigLDAP
+
+This removes a config. Any sub configs will need to removes first. If any are
+present, this function will error.
+
+    #removes 'foo/bar'
+    $zconf->delConfig('foo/bar');
+    if(defined($zconf->{error})){
+        print 'error!';
+    }
+
+=cut
+
+sub delConfigLDAP{
+	my $self=$_[0];
+	my $config=$_[1];
+
+	my @subs=$self->getSubConfigsFile($config);
+	#return if there are any sub configs
+	if (defined($subs[0])) {
+		warn('zconf delConfigLDAP:33: Could not remove the config as it has sub configs');
+		$self->{error}='33';
+		$self->{errorString}='Could not remove the config as it has sub configs';
+		return undef;
+	}
+
+	#makes sure it exists before continuing
+	#This will also make sure the config exists.
+	my $returned = $self->configExistsLDAP($config);
+	if (defined($self->{error})){
+		warn('ZConf delConfigLDAP:12: The config, "'.$config.'", does not exist');
+		$self->{error}='12';
+		$self->{errorString}='The config, "'.$config.'", does not exist';
+		return undef;
+	}
+
+	#connects up to LDAP... will be used later
+	my $ldap=$self->LDAPconnect();
+	
+	#gets the DN and use $ldap since it is already setup
+	my $entry=$self->LDAPgetConfEntry($config, $ldap);
+
+	#remove it
+	$entry->delete();
+	$entry->update($ldap);
+
+	#return if it could not be removed
+	if($ldap->error()){
+		warn('zconf delConfigLDAP:0: Could not delete the LDAP entry, "'.
+			 $entry->dn().'". LDAP return an error of "'.$ldap->error.'" and an'.
+			 'error code of "'.$ldap->errcode.'"');
+		$self->{error}='0';
+		$self->{errorString}=' Could not delete the LDAP entry, "'.
+							$entry->dn().'". LDAP return an error of "'.$ldap->error.
+							'" and an error code of "'.$ldap->errcode.'"';
+
 		return undef;
 	}
 
@@ -964,7 +1148,7 @@ sub delSet{
 		return undef;
 	}
 
-	#
+	#do it
 	if($self->{args}{backend} eq "file"){
 		$returned=$self->delSetFile($config, $set);
 	}else{
@@ -1044,7 +1228,7 @@ sub delSetFile{
 #	}
 
 	if (!unlink($fullpath)) {
-		warn('zconf delSetFile:14: "'.$fullpath.'" could not be unlinked');
+		warn('zconf delSetFile:29: "'.$fullpath.'" could not be unlinked');
 		$self->{error}=29;
 		$self->{errorString}='"'.$fullpath.'" could not be unlinked.';
 		return undef;
@@ -1088,28 +1272,24 @@ sub delSetLDAP{
 		return undef;
 	}
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf writeChooserLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#creates the DN from the config
 	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
 
-	#makes sure it exists and the return is the expected one
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
-	my $entry=$ldapmesg->entry;
+	#connects up to LDAP
+	my $ldap=$self->LDAPconnect();
+	if (defined($self->{error})) {
+		warn('zconf delSetLDAP: LDAPconnect errored... returning...');
+		return undef;
+	}
+
+	#gets the entry
+	my $entry=$self->LDAPgetConfEntry($config, $ldap);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
+
 	if(!defined($entry->dn())){
 		warn("zconf writeChooserLDAP:13: Expected DN, '".$dn."' not found.");
 		$self->{error}=13;
@@ -1314,26 +1494,16 @@ For the most part it is not intended to be called directly.
 sub getAvailableSetsLDAP{
 	my ($self, $config) = @_;
 		
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf getAvailableSetsLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#converts the config name to a DN
 	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
 
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+	#gets the message
+	my $ldapmesg=$self->LDAPgetConfMessage($config);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	my %hashedmesg=LDAPhash($ldapmesg);
 	if(!defined($hashedmesg{$dn})){
 		warn("zconf getAvailableSetsLDAP:13: Expected DN, '".$dn."' not found.");
@@ -1559,22 +1729,6 @@ One arguement is accepted and that is the config to look under.
 #gets the configs under a config
 sub getSubConfigsLDAP{
 	my ($self, $config)= @_;
-		
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf getSubConfigsLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
 
 	my $dn;
 	#converts the config name to a DN
@@ -1585,8 +1739,13 @@ sub getSubConfigsLDAP{
 		$dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
 	}
 
-	#searches and builds hash of the return
-	my $ldapmesg=$ldap->search(scope=>"one", base=>$dn,filter => "(objectClass=*)");
+	#gets the message
+	my $ldapmesg=$self->LDAPgetConfMessageOne($config);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	my %hashedmesg=LDAPhash($ldapmesg);
 
 	#
@@ -1611,6 +1770,169 @@ sub getSubConfigsLDAP{
 	}
 
 	return @sets;
+}
+
+=head2 LDAPconnect
+
+This generates a Net::LDAP object based on the LDAP backend.
+
+    my $ldap=$zconf->LDAPconnect();
+    if(defined($zconf->{error})){
+        print "error!";
+    }
+
+=cut
+
+sub LDAPconnect{
+	my $self=$_[0];
+
+	$self->errorBlank;
+
+	#connects up to LDAP
+	my $ldap;
+	eval {
+   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
+				bindDN => $self->{args}{"ldap/bind"},
+				bindpw => $self->{args}{"ldap/password"},
+				base   => $self->{args}{"ldap/homeDN"},
+				searchattrs => [qw(dn)]);
+	};
+	if($@){
+		warn("zconf LDAPconnect:1: LDAP connection failed with '".$@."'.");
+		$self->{error}=1;
+		$self->{errorString}="LDAP connection failed with '".$@."'";
+		return undef;
+	};
+
+	return $ldap;
+}
+
+=head2 LDAPgetConfMessage
+
+Gets a Net::LDAP::Message object that was created doing a search for the config with
+the scope set to base.
+
+    #gets it for 'foo/bar'
+    my $mesg=$zconf->LDAPgetConfMessage('foo/bar');
+    #gets it using $ldap for the connection
+    my $mesg=$zconf->LDAPgetConfMessage('foo/bar', $ldap);
+    if(defined($zconf->{error})){
+        print "error!";
+    }
+
+=cut
+
+sub LDAPgetConfMessage{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $ldap=$_[2];
+
+	$self->errorBlank;
+
+	#only connect to LDAP if needed
+	if (!defined($ldap)) {
+		#connects up to LDAP
+		$ldap=$self->LDAPconnect;
+		#return upon error
+		if (defined($self->{error})) {
+			return undef;
+		}
+	}
+
+	#creates the DN from the config
+	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
+
+	#gets the message
+	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+
+	return $ldapmesg;
+}
+
+=head2 LDAPgetConfMessageOne
+
+Gets a Net::LDAP::Message object that was created doing a search for the config with
+the scope set to one.
+
+    #gets it for 'foo/bar'
+    my $mesg=$zconf->LDAPgetConfMessageOne('foo/bar');
+    #gets it using $ldap for the connection
+    my $mesg=$zconf->LDAPgetConfMessageOne('foo/bar', $ldap);
+    if(defined($zconf->{error})){
+        print "error!";
+    }
+
+=cut
+
+sub LDAPgetConfMessageOne{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $ldap=$_[2];
+
+	$self->errorBlank;
+
+	#only connect to LDAP if needed
+	if (!defined($ldap)) {
+		#connects up to LDAP
+		$ldap=$self->LDAPconnect;
+		#return upon error
+		if (defined($self->{error})) {
+			warn('zconf LDAPgetConfMessageOne: LDAPconnect errored... returning...');
+			return undef;
+		}
+	}
+
+	#creates the DN from the config
+	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
+
+	$dn =~ s/^,//;
+
+	#gets the message
+	my $ldapmesg=$ldap->search(scope=>"one", base=>$dn,filter => "(objectClass=*)");
+
+	return $ldapmesg;
+}
+
+=head2 LDAPgetConfEntry
+
+Gets a Net::LDAP::Message object that was created doing a search for the config with
+the scope set to base.
+
+    #gets it for 'foo/bar'
+    my $entry=$zconf->LDAPgetConfEntry('foo/bar');
+    #gets it using $ldap for the connection
+    my $entry=$zconf->LDAPgetConfEntry('foo/bar', $ldap);
+    if(defined($zconf->{error})){
+        print "error!";
+    }
+
+=cut
+
+sub LDAPgetConfEntry{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $ldap=$_[2];
+
+	$self->errorBlank;
+
+	#only connect to LDAP if needed
+	if (!defined($ldap)) {
+		#connects up to LDAP
+		$ldap=$self->LDAPconnect;
+		#return upon error
+		if (defined($self->{error})) {
+			return undef;
+		}
+	}
+
+
+	#creates the DN from the config
+	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
+
+	#gets the message
+	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+	my $entry=$ldapmesg->entry;
+
+	return $entry;
 }
 
 =head2 read
@@ -1660,7 +1982,7 @@ sub read{
 
 	#checks to make sure the config does exist
 	if(!$self->configExists($args{config})){
-		warn("zconf read:12: '".$args{config}."' does not exist.");
+		warn("zconf read:12: '".$args{config}."' does not exist");
 		$self->{error}=12;
 		$self->{errorString}="'".$args{config}."' does not exist.";
 		return undef;			
@@ -1669,24 +1991,12 @@ sub read{
 	#gets the set to use if not set
 	if(!defined($args{set})){
 		$args{set}=$self->chooseSet($args{config});
-
-		#do something if the choosen does not exist
-		if(! -f $self->{args}{base}."/".$args{config}."/".$args{set}){
-			if(!defined($args{nonExistantChooen})){
-				$args{nonExistantChooen}=$self->{args}{default};
-			}
-
-			if($args{nonExistantChooen} eq "default"){
-				$args{set}=$self->{args}{default};
-			};
-				
-			if($args{nonExistantChooen} eq "error"){
-				warn("zconf readFile:12: '".$args{config}."' .");
-				$self->{error}=12;
-				$self->{errorString}="'".$args{config}."' .";
-				return undef;
-			};
-		};
+		if (defined($self->{error})) {
+			warn('zconf read:32: Unable to choose a set');
+			$self->{error}='32';
+			$self->{errorString}='Unable to choose a set.';
+			return undef;
+		}
 	};
 
 	my $returned=undef;
@@ -1845,28 +2155,16 @@ sub readLDAP{
 		return undef;			
 	};
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf readLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#creates the DN from the config
 	my $dn=$self->config2dn($args{config}).",".$self->{args}{"ldap/base"};
 
-	#makes sure it exists and the return is the expected one
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn, filter=>"(objectClass=*)");
-	my $entry=$ldapmesg->entry;
+	#gets the LDAP entry
+	my $entry=$self->LDAPgetConfEntry($args{config});
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	if(!defined($entry->dn())){
 		warn("zconf readLDAP:13: Expected DN, '".$dn."' not found.");
 		$self->{error}=13;
@@ -2105,26 +2403,16 @@ sub readChooserLDAP{
 		return undef;			
 	};
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf readChooserFromLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#creates the DN from the config
 	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
 
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
+	#gets the LDAP mesg
+	my $ldapmesg=$self->LDAPgetConfMessage($config);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	my %hashedmesg=LDAPhash($ldapmesg);
 	if(!defined($hashedmesg{$dn})){
 		warn("zconf readChooserFromLDAP:13: Expected DN, '".$dn."' not found.");
@@ -2800,28 +3088,23 @@ sub writeChooserLDAP{
 		return undef;
 	};
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf writeChooserLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#creates the DN from the config
 	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
 
-	#makes sure it exists and the return is the expected one
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
-	my $entry=$ldapmesg->entry;
+	#connects to LDAP
+	my $ldap=$self->LDAPconnect();
+	if (defined($self->{error})) {
+		warn('zconf writeSetFromLoadedConfigLDAP: LDAPconnect errored... returning...');
+		return undef;
+	}
+
+	#gets the LDAP entry
+	my $entry=$self->LDAPgetConfEntry($config, $ldap);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	if(!defined($entry->dn())){
 		warn("zconf readChooserFromLDAP:13: Expected DN, '".$dn."' not found.");
 		$self->{error}=13;
@@ -3108,28 +3391,23 @@ sub writeSetFromHashLDAP{
 		$int++;
 	};
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf writeChooserLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#creates the DN from the config
 	my $dn=$self->config2dn($args{config}).",".$self->{args}{"ldap/base"};
 
-	#makes sure it exists and the return is the expected one
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
-	my $entry=$ldapmesg->entry;
+	#connects to LDAP
+	my $ldap=$self->LDAPconnect();
+	if (defined($self->{error})) {
+		warn('zconf writeSetFromLoadedConfigLDAP: LDAPconnect errored... returning...');
+		return undef;
+	}
+
+	#gets the LDAP entry
+	my $entry=$self->LDAPgetConfEntry($args{config}, $ldap);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+	
 	if(!defined($entry->dn())){
 		warn("zconf writeChooserLDAP:13: Expected DN, '".$dn."' not found.");
 		$self->{error}=13;
@@ -3143,7 +3421,7 @@ sub writeSetFromHashLDAP{
 			return undef;				
 		};
 	};
-		
+	
 	#makes sure the zconfSet attribute is set for the config in question
 	my @attributes=$entry->get_value('zconfSet');
 	#if the 0th is not defined, it this zconf entry is borked and it needs to have the set value added 
@@ -3164,7 +3442,7 @@ sub writeSetFromHashLDAP{
 	}else{
 		$entry->add(zconfSet=>$args{set});
 	}
-
+	
 	#
 	@attributes=$entry->get_value('zconfData');
 	#if the 0th is not defined, it this zconf entry is borked and it needs to have it added...  
@@ -3398,28 +3676,23 @@ sub writeSetFromLoadedConfigLDAP{
 
 	my $setstring=$args{set}."\n".$zml->string();
 
-	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf writeChooserLDAP:1: LDAP connection failed with '".$@."'.");
-		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
-		return undef;
-	};
-
 	#creates the DN from the config
 	my $dn=$self->config2dn($args{config}).",".$self->{args}{"ldap/base"};
 
-	#makes sure it exists and the return is the expected one
-	my $ldapmesg=$ldap->search(scope=>"base", base=>$dn,filter => "(objectClass=*)");
-	my $entry=$ldapmesg->entry;
+	#connects to LDAP
+	my $ldap=$self->LDAPconnect();
+	if (defined($self->{error})) {
+		warn('zconf writeSetFromLoadedConfigLDAP: LDAPconnect errored... returning...');
+		return undef;
+	}
+
+	#gets the LDAP entry
+	my $entry=$self->LDAPgetConfEntry($args{config}, $ldap);
+	#return upon error
+	if (defined($self->{error})) {
+		return undef;
+	}
+
 	if(!defined($entry->dn())){
 		warn("zconf writeChooserLDAP:13: Expected DN, '".$dn."' not found.");
 		$self->{error}=13;
@@ -3662,6 +3935,14 @@ The sets exist for the specified config.
 =head2 31
 
 Did not find a matching set.
+
+=head2 32
+
+Unable to choose a set.
+
+=head2 33
+
+Unable to remove the config as it has sub configs.
 
 =head1 ERROR CHECKING
 
