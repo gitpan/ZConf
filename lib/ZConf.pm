@@ -957,8 +957,8 @@ sub delConfig{
 		}
 	}
 
-	if (!$self->{args}{backend} eq "file") {
-		$returned=$self->delSetFile($config);
+	if ($self->{args}{backend} ne "file") {
+		$returned=$self->delConfigFile($config);
 	}
 
 	return $returned;
@@ -1005,9 +1005,9 @@ sub delConfigFile{
 		return undef;
 	}
 
-	my @sets=$self->getAvailableSets($config);
+	my @sets=$self->getAvailableSetsFile($config);
 	if (defined($self->{error})) {
-		warn('zconf delConfigFile: getAvailableSets set an error');
+		warn('zconf delConfigFile: getAvailableSetsFile set an error');
 		return undef;
 	}
 
@@ -1026,7 +1026,7 @@ sub delConfigFile{
 	#the path to the config
 	my $configpath=$self->{args}{base}."/".$config;
 
-	if (!unlink($configpath)) {
+	if (!rmdir($configpath)) {
 		warn('zconf delConfigFile:29: "'.$configpath.'" could not be unlinked');
 		$self->{error}=29;
 		$self->{errorString}='"'.$configpath.'" could not be unlinked.';
@@ -1078,16 +1078,24 @@ sub delConfigLDAP{
 	#gets the DN and use $ldap since it is already setup
 	my $entry=$self->LDAPgetConfEntry($config, $ldap);
 
+	#if $entry is undefined, it was not found
+	if (!defined($entry)){
+		warn('zconf delConfigLDAP:13: The expected DN was not found');
+		$self->{error}='13';
+		$self->{errorString}='The expected DN was not found';
+		return undef;
+	}
+
 	#remove it
 	$entry->delete();
 	$entry->update($ldap);
 
 	#return if it could not be removed
 	if($ldap->error()){
-		warn('zconf delConfigLDAP:0: Could not delete the LDAP entry, "'.
+		warn('zconf delConfigLDAP:34: Could not delete the LDAP entry, "'.
 			 $entry->dn().'". LDAP return an error of "'.$ldap->error.'" and an'.
 			 'error code of "'.$ldap->errcode.'"');
-		$self->{error}='0';
+		$self->{error}='34';
 		$self->{errorString}=' Could not delete the LDAP entry, "'.
 							$entry->dn().'". LDAP return an error of "'.$ldap->error.
 							'" and an error code of "'.$ldap->errcode.'"';
@@ -1110,7 +1118,7 @@ the second is the name of the set.
     }
     
     #does the same, but using the zconf error reporting method
-    $zconf->delSetFile("foo/bar", "someset";
+    $zconf->delSetFile("foo/bar", "someset");
     if(defined($zconf->{error})){
         print "delSet failed\n";
     }
@@ -1176,7 +1184,7 @@ the second is the name of the set.
     }
     
     #does the same, but using the zconf error reporting method
-    $zconf->delSetFile("foo/bar", "someset";
+    $zconf->delSetFile("foo/bar", "someset");
     if(defined($zconf->{error})){
         print "delSet failed\n";
     }
@@ -1249,7 +1257,7 @@ the second is the name of the set.
     }
     
     #does the same, but using the zconf error reporting method
-    $zconf->delSetLDAP("foo/bar", "someset";
+    $zconf->delSetLDAP("foo/bar", "someset");
     if(defined($zconf->{error})){
         print "delSet failed\n";
     }
@@ -1460,7 +1468,7 @@ sub getAvailableSetsFile{
 	my @direntries=readdir(CONFIGDIR);
 	closedir(CONFIGDIR);
 
-	#remove, ""^."" , ""."" , and "".."" from @direntries
+	#remove hidden files and directory recursors from @direntries
 	@direntries=grep(!/^\./, @direntries);
 	@direntries=grep(!/^\.\.$/, @direntries);
 	@direntries=grep(!/^\.$/, @direntries);
@@ -1897,6 +1905,8 @@ sub LDAPgetConfMessageOne{
 Gets a Net::LDAP::Message object that was created doing a search for the config with
 the scope set to base.
 
+It returns undef if it is not found.
+
     #gets it for 'foo/bar'
     my $entry=$zconf->LDAPgetConfEntry('foo/bar');
     #gets it using $ldap for the connection
@@ -1923,7 +1933,6 @@ sub LDAPgetConfEntry{
 			return undef;
 		}
 	}
-
 
 	#creates the DN from the config
 	my $dn=$self->config2dn($config).",".$self->{args}{"ldap/base"};
@@ -3808,9 +3817,7 @@ Any variable name is legit as long it does not match any of the following.
 
 =head1 ERROR CODES
 
-=head2 0
-
-LDAP connection error
+Since version '0.6.0' any time '$zconf->{error}' is true, there is an error.
 
 =head2 1
 
@@ -3943,6 +3950,10 @@ Unable to choose a set.
 =head2 33
 
 Unable to remove the config as it has sub configs.
+
+=head2 34
+
+LDAP connection error
 
 =head1 ERROR CHECKING
 

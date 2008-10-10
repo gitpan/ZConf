@@ -1,5 +1,12 @@
 Revision history for ZConf
 
+0.6.0	2008-10-10/16:40
+		-Changed the LDAP connection error code from 0 to 34. Now any time it's value is true there is an error.
+		-Clean up the POD for delSet*
+		-Fix call to delSetFile in delConfig instead of delConfigFile
+		-delConfigFile now uses getAvailableSetsFile instead of getAvailableSets
+		
+
 0.5.0   2008-10-09/19:00
 		-Add LDAPconnect, LDAPgetConfMessage, LDAPgetConfMessageOne, LDAPgetConfEntry, delConfig, delConfigFile, and delConfigLDAP.
 		-Now uses LDAPconnect for forming all connections.
