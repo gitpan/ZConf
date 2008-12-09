@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.5.0
+Version 0.7.0
 
 =cut
 
-our $VERSION = '0.5.0';
+our $VERSION = '0.7.0';
 
 =head1 SYNOPSIS
 
@@ -853,7 +853,7 @@ sub createConfigLDAP{
 		my $returned=LDAPmakepathSimple($ldap, ["top", "zconf"], "cn",
 					$path, $self->{args}{"ldap/base"});
 		if(!$returned){
-			warn("zconf createLDAPConfig:22: Adding '".$dn."' failed when executing LDAPmakepathSimple.");
+			warn("zconf createConfigLDAP:22: Adding '".$dn."' failed when executing LDAPmakepathSimple.");
 			$self->{errorString}="zconf createLDAPConfig:22: Adding '".$dn."' failed when executing LDAPmakepathSimple.\n";
 			$self->{error}=22;
 			return undef;
@@ -1131,7 +1131,7 @@ sub delSet{
 	my $set=$_[2];
 	
 	$self->errorBlank;
-	
+
 	#return if no set is given
 	if (!defined($set)){
 		warn("zconf delSet:24: \$set is not defined");
@@ -1297,7 +1297,6 @@ sub delSetLDAP{
 		return undef;
 	}
 
-
 	if(!defined($entry->dn())){
 		warn("zconf writeChooserLDAP:13: Expected DN, '".$dn."' not found.");
 		$self->{error}=13;
@@ -1322,7 +1321,6 @@ sub delSetLDAP{
 		while(defined($attributes[$attributesInt])){
 			if($attributes[$attributesInt] eq $set){
 				$setFound=1;
-				print "set found\n";
 				$entry->delete(zconfSet=>[$attributes[$attributesInt]]);
 			};
 			$attributesInt++;
@@ -1340,7 +1338,6 @@ sub delSetLDAP{
 			if($attributes[$attributesInt] =~ /^$set\n/){
 				$setFound=1;
 				$entry->delete(zconfData=>[$attributes[$attributesInt]]);
-				print "data found\n";
 			};
 			$attributesInt++;
 		};
@@ -4074,6 +4071,120 @@ This is the password to use for when connecting to the server.
 		DESC 'A zconf entry.'
 		MAY ( cn $ zconfData $ zconfChooser $ zconfSet )
 		)
+
+=head1 UTILITIES
+
+These are installed with the module.
+
+=head2 zccreate
+
+Used for creating empty config or set.
+
+=head3 -c <config>
+
+The config to be created.
+
+=head3 -s <set>
+
+The set to be created. This is an optional option.
+
+=head2 zcget
+
+This fetches the value for a variable.
+
+=head3 -c <config>
+
+The config to be used for fetching the key.
+
+=head3 -k <key>
+
+This is the key to get.
+
+=head3 -n
+
+Do not print a newline.
+
+=head3 -s <set>
+
+The set to be created. If it is not specified, the default will
+be used.
+
+=head2 zcls
+
+This lists subconfigs.
+
+=head3 -c <config>
+
+The config to list the subconfigs of. If '-c ""' is used, it will
+show the base ones.
+
+=head3 -s
+
+IF this is specified, the sets of the config will be listed.
+
+=head2 zcrm
+
+This removes a config or set.
+
+=head3 -c <config>
+
+This is the config to be removed.
+
+=head3 -s <set>
+
+If this is specified, the config is not removed, but the specified set for
+the specified config.
+
+=head2 zcset
+
+This sets a specified value for a variable.
+
+=head3 -c <config>
+
+This is the config to be operated on.
+
+=head3 -k <variable>
+
+This is the key to set.
+
+=head3 -s <set>
+
+This is the set to operate on. If it is not defined, it will be default
+will be used.
+
+=head3 -v <value>
+
+The value of set the key to.
+
+=head2 zcvdel
+
+This deletes a variable.
+
+=head3 -c <config>
+
+This is the config to be operated on.
+
+=head3 -k <variable>
+
+This is the key to be removed.
+
+=head3 -s <set>
+
+This is the set to operate on. If it is not defined, it will be default
+will be used.
+
+=head2 zcvls
+
+This shows the variables in a config.
+
+=head3 -c <config>
+
+This is the config to be operated on.
+
+=head3 -s <set>
+
+This is the set to operate on. If it is not defined, it will be default
+will be used.
 
 =head1 AUTHOR
 

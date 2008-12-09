@@ -1,0 +1,189 @@
+#!/usr/bin/perl
+#Copyright (c) 2008, Zane C. Bowers
+#All rights reserved.
+#
+#Redistribution and use in source and binary forms, with or without modification,
+#are permitted provided that the following conditions are met:
+#
+#   * Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#   * Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+#IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+#INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+#BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+#DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+#THE POSSIBILITY OF SUCH DAMAGE.
+
+use strict;
+use warnings;
+use Getopt::Std;
+use ZConf;
+
+$Getopt::Std::STANDARD_HELP_VERSION = 1;
+
+#version function
+sub main::VERSION_MESSAGE {
+	print "zcset 0.0.1\n";
+}
+
+#print help
+sub main::HELP_MESSAGE {
+	print "\n".
+	      "-c <config>  The config to operate on.\n".
+		  "-s <set>  The set to operate on.\n".
+		  "-k <key>  The key to be operated on.\n".
+		  "-v <value>  The value to set it to.\n".
+		  "-f <file>  The file to read and set it to.\n";
+}
+
+#gets the options
+my %opts=();
+getopts('s:c:k:v:f:', \%opts);
+
+#makes sure that -c is set
+if (!defined($opts{c})) {
+	warn('zcset: -c not defined');
+	exit 1;
+}
+
+#makes sure that -k is set
+if (!defined($opts{k})) {
+	warn('zcset: -k not defined');
+	exit 1;
+}
+
+#make sure both -k and -v are not defined
+if ((!defined($opts{v})) && (!defined($opts{f}))) {
+	warn('zcset: both -v and -f are not defined');
+	exit 1;
+}
+
+#make sure both -k and -v are not defined at the same time
+if ((defined($opts{v})) && (defined($opts{f}))) {
+	warn('zcset: both -v and -f are not defined');
+	exit 1;
+}
+
+#if -f is set, read it
+
+#inits zconf
+my $zconf = ZConf->new();
+if($zconf->{error}){
+	exit 1;
+}
+
+#sets up the arguement hash that will be passed for reading and writing
+my %args;
+$args{config}=$opts{c};
+#if a set is specified, set it
+if (defined($opts{s})) {
+	$args{set}=$opts{s};
+}
+
+#reads it
+$zconf->read(\%args);
+if(defined($zconf->{error})){
+	exit 1;
+}
+
+#sets it
+$zconf->setVar($opts{c}, $opts{k}, $opts{v});
+if (defined($zconf->{error})) {
+	exit 1;
+}
+
+#writes it
+$zconf->writeSetFromLoadedConfig(\%args);
+if (defined($zconf->{error})) {
+	exit 1;
+}
+
+=head1 NAME
+
+zcset - Sets a value in a ZConf config.
+
+=head1 SYNOPSIS
+
+zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-v> <value>
+zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-f> <file>
+
+=head1 SWTICHES
+
+=head2 -c <config>
+
+This is the configuration to operate on.
+
+=head2 -f <file>
+
+Reads the file into the variable. Either this or -v needs set.
+
+=head2 -k <key>
+
+This is the key to operate on.
+
+=head2 -s <set>
+
+The set to operate on. This is the only optional switch. If it is now defined,
+The choosen/default config will be used.
+
+=head2 -v <value>
+
+This is the value to set it to. Either this or -f needs used.
+
+=head1 AUTHOR
+
+Copyright (c) 2008, Zame C. Bowers <vvelox@vvelox.net>
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS` OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+=head1 Changelog
+
+=head2 2008-10-06/3:00 0.0.1
+
+Misc. warning and POD cleanups.
+
+=head2 2008-10-08/1:45 0.0.0
+
+Initial release.
+
+=head1 SCRIPT CATEGORIES
+
+Desktop
+
+=head1 OSNAMES
+
+any
+
+=head1 README
+
+zcset - Sets a value in a ZConf config.
+
+=cut

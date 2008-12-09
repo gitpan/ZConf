@@ -1,5 +1,8 @@
 Revision history for ZConf
 
+0.7.0	2008-12-09/7:30
+		-Import the ZConf utilities.
+
 0.6.0	2008-10-10/16:40
 		-Changed the LDAP connection error code from 0 to 34. Now any time it's value is true there is an error.
 		-Clean up the POD for delSet*
