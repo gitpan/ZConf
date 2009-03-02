@@ -7,10 +7,3 @@ lib/ZConf.pm
 t/00-load.t
 t/pod-coverage.t
 t/pod.t
-bin/zccreate
-bin/zcget
-bin/zcls
-bin/zcrm
-bin/zcset
-bin/zcvdel
-bin/zcvls

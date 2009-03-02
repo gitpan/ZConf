@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 0.7.0
+Version 1.0.0
 
 =cut
 
-our $VERSION = '0.7.0';
+our $VERSION = '1.0.0';
 
 =head1 SYNOPSIS
 
@@ -71,7 +71,7 @@ sub new {
 		#that the caller manually specified it for some reason.
 		if(!-f $args{file}){
 			if(open("CREATECONFIG", '>', $args{file})){
-				print CREATECONFIG "fileonly=1\n";
+				print CREATECONFIG "fileonly=1\nreadfallthrough=1\n";
 				close("CREATECONFIG");
 			}else{
 				print "zconf new error: '".$args{file}."' could not be opened.\n";
@@ -351,95 +351,21 @@ sub chooseSet{
 		return undef;
 	};
 
-	my $returned=undef;
 
-	#get the sets
-	if($self->{args}{backend} eq "file"){
-		$returned=$self->chooseSetFile($config);
-	}else{
-		if($self->{args}{backend} eq "ldap"){
-			$returned=$self->chooseSetLDAP($config);
-		};
-	};
-
-	if(!defined($returned)){
-		return $self->{args}{default};
-	};
-		
-	return $returned;
-};
-
-
-=head2 chooseSetFile
-
-Functions just like chooseSet, but for the file backend. It
-is intended for internal use only and should generally not
-be used by programs.
-
-	my $set=$zconf->chooseSetFile("foo/bar")
-
-=cut
-
-sub chooseSetFile{
-	my ($self, $config)= @_;
+	my $chooserstring=$self->readChooser($config);
 	
-	#the path to the file
-	my $chooser=$self->{args}{base}."/".$config."/.chooser";
-		
-	#if the chooser does not exist, use the default
-	if(!-f $chooser){
-		return $self->{args}{default};
-	};
-		
-	#open the file to 
-	if(!open("READCHOOSER", $chooser)){
-		return $self->{args}{default};
-	};
-	my $chooserstring=<READCHOOSER>;
-	close("READCHOOSER");
-		
 	my ($success, $choosen)=choose($chooserstring);
-
+	
 	if(!defined($choosen)){
 		return $self->{args}{default};
 	};
-
+	
 	if (!$self->setNameLegit($choosen)){
-		warn("zconf chooseSetLDAP:27: '".$choosen."' is not a legit set name. Using the".
+		warn("zconf chooseSet:27: '".$choosen."' is not a legit set name. Using the".
 				" default of '".$self->{args}{default}."'.");
 		return $self->{args}{default};
 	};
 	
-	return $choosen;
-};
-
-=head2 chooseSetLDAP
-
-Functions just like chooseSet, but for the LDAP backend. Is
-is intended for internal use only and should generally notb
-be used by programs.
-
-	my $set=$zconf->chooseSetLDAP("foo/bar")
-
-=cut
-
-sub chooseSetLDAP{
-	my ($self, $config)= @_;
-	
-	my $chooserstring=$self->readChooserLDAP($config);
-
-	my ($success, $choosen)=choose($chooserstring);
-
-	if(!defined($choosen)){
-		return $self->{args}{default};
-	};
-
-	if (!$self->setNameLegit($choosen)){
-		warn("zconf chooseSetLDAP:27: '".$choosen."' is not a legit set name. Using the".
-				" default of '".$self->{args}{default}."'.");
-		return $self->{args}{default};
-	};
-
 	return $choosen;
 };
 
@@ -534,6 +460,11 @@ sub configExists{
 		if($self->{args}{backend} eq "ldap"){
 			$returned=$self->configExistsLDAP($config);
 		};
+		#if it errors and read fall through is turned on, try the file backend
+		if ($self->{error}&&$self->{args}{readfallthrough}) {
+			$self->errorBlank;
+			$returned=$self->configExistsFile($config);
+		}
 	};
 
 	if(!$returned){
@@ -1427,6 +1358,11 @@ sub getAvailableSets{
 		if($self->{args}{backend} eq "ldap"){
 			@returned=$self->getAvailableSetsLDAP($config);
 		};
+		#if it errors and read fall through is turned on, try the file backend
+		if ($self->{error}&&$self->{args}{readfallthrough}) {
+			$self->errorBlank;
+			@returned=$self->getAvailableSetsFile($config);
+		}
 	};
 
 	return @returned;
@@ -1653,6 +1589,11 @@ sub getSubConfigs{
 	}else{
 		if($self->{args}{backend} eq "ldap"){
 			@returned=$self->getSubConfigsLDAP($config);
+		}
+		#if it errors and read fall through is turned on, try the file backend
+		if ($self->{error}&&$self->{args}{readfallthrough}) {
+			$self->errorBlank;
+			@returned=$self->getSubConfigsFile($config);
 		}
 	}
 
@@ -2014,6 +1955,13 @@ sub read{
 		if($self->{args}{backend} eq "ldap"){
 			$returned=$self->readLDAP(\%args);
 		};
+		#if it errors and read fall through is turned on, try the file backend
+		if ($self->{error}&&$self->{args}{readfallthrough}) {
+			$self->errorBlank;
+			$returned=$self->readFile(\%args);
+			#we return here because if we don't we will pointlessly sync it
+			return $returned;
+		}
 	};
 		
 	if(!$returned){
@@ -2097,7 +2045,7 @@ sub readFile{
 	while(defined($rawdata[$rawdataInt])){
 		if($rawdata[$rawdataInt] =~ /^ /){
 			#this if statement prevents it from being ran on the first line if it is not properly formated
-			if(!defined($prevVar)){
+			if(defined($prevVar)){
 				chomp($rawdata[$rawdataInt]);
 				$rawdata[$rawdataInt]=~s/^ //;#remove the trailing space
 				#add in the line return and 
@@ -2289,6 +2237,13 @@ sub readChooser{
 		if($self->{args}{backend} eq "ldap"){
 			$returned=$self->readChooserLDAP($config);
 		};
+		#if it errors and read fall through is turned on, try the file backend
+		if ($self->{error}&&$self->{args}{readfallthrough}) {
+			$self->errorBlank;
+			$returned=$self->readChooserFile($config);
+			#we return here because if we don't we will pointlessly sync it
+			return $returned;
+		}
 	};
 
 	if($self->{error}){
@@ -3166,7 +3121,7 @@ sub writeSetFromHash{
 
 	#return false if the config is not set
 	if (!defined($args{config})){
-		warn("zconf writeChooserFile:12: \$config is not defined");
+		warn("zconf writeSetFromHash:12: \$config is not defined");
 		$self->{error}=17;
 		$self->{errorString}='$config not defined';
 		return undef;			
@@ -3175,7 +3130,7 @@ sub writeSetFromHash{
 	#make sure the config name is legit
 	my ($error, $errorString)=$self->configNameCheck($args{config});
 	if(defined($error)){
-		warn("zconf writeChooserFile:12:".$error.": ".$errorString);
+		warn("zconf writeSetFromHash:12:".$error.": ".$errorString);
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
 		return undef;
@@ -3183,7 +3138,7 @@ sub writeSetFromHash{
 		
 	#checks to make sure the config does exist
 	if(!$self->configExists($args{config})){
-		warn("zconf writeChooserFile:12: '".$args{config}."' does not exist.");
+		warn("zconf writeSetFromHash:12: '".$args{config}."' does not exist.");
 		$self->{error}=12;
 		$self->{errorString}="'".$args{config}."' does not exist.";
 		return undef;			
@@ -4011,6 +3966,17 @@ This is a chooser string that chooses what the name of the default to use should
 =head3 fileonly
 
 This is a boolean value. If it is set to 1, only the file backend is used.
+
+=head2 readfallthrough
+
+If this is set, if any of the functions below error when trying the LDAP backend, it will
+fall through to the file backend.
+
+    configExists
+    getAvailableSets
+    getSubConfigs
+    read
+    readChooser
 
 =head2 LDAP Backend Keys
 
