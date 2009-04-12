@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 1.0.0
+Version 1.1.0
 
 =cut
 
-our $VERSION = '1.0.0';
+our $VERSION = '1.1.0';
 
 =head1 SYNOPSIS
 
@@ -46,13 +46,24 @@ is returned. The hash can contain various initization options.
 
 When it is run for the first time, it creates a filesystem only config file.
 
-=over
+=head3 args hash
 
-=item file
+=head4 file
 
 The default is 'xdf_config_home/zconf.zml', which is generally '~/.config/zconf.zml'.
 
-=back
+This is incompatible with the sys option.
+
+=head4 sys
+
+This turns system mode on. And sets it to the specified system name.
+
+This is incompatible with the file option.
+
+    my $zconf=ZConf->new();
+    if((!defined($zconf)) || ($zconf->{error})){
+        print "Error!\n";
+    }
 
 =cut
 
@@ -61,247 +72,6 @@ sub new {
 	my %args;
 	if(defined($_[1])){
 		%args= %{$_[1]};
-	};
-
-	#set the config file if it is not already set
-	if(!defined($args{file})){
-		$args{file}=xdg_config_home()."/zconf.zml";
-		#Make the config file if it does not exist.
-		#We don't create it if it is manually specified as we assume
-		#that the caller manually specified it for some reason.
-		if(!-f $args{file}){
-			if(open("CREATECONFIG", '>', $args{file})){
-				print CREATECONFIG "fileonly=1\nreadfallthrough=1\n";
-				close("CREATECONFIG");
-			}else{
-				print "zconf new error: '".$args{file}."' could not be opened.\n";
-				return undef;
-			};
-		};
-	};
-
-	#sets the base directory
-	$args{base}=xdg_config_home()."/zconf/";
-
-	#do something if the base directory does not exist
-	if(! -d $args{base}){
-		#if the base diretory can not be created, exit
-		if(!mkdir($args{base})){
-			print "zconf new error: '".$args{base}."' does not exist and could not be created.\n";
-			return undef;
-		};		
-	};
-
-	my $zconfzmlstring="";#holds the contents of zconf.zml
-	#returns undef if it can't read zconf.zml
-	if(open("READZCONFZML", $args{file})){
-		$zconfzmlstring=join("", <READZCONFZML>);
-		my $tempstring;
-		close("READZCONFZML");
-	}else{
-		print "zconf new error: Could not open'".$args{file}."\n";
-		return undef;
-	};
-
-	#tries to parse the zconf.zml
-	my $zml=ZML->new();
-	$zml->parse($zconfzmlstring);
-	if($zml->{error}){
-		warn("ZConf new:28: ZML->parse error, '".$zml->{error}."', '".$zml->{errorString}."'.");
-		return undef;
-	};
-	my %zconf=%{$zml->{var}};
-
-	#if defaultChooser is defined, use it to find what the default should be
-	if(defined($zconf{defaultChooser})){
-		#runs choose if it is defined
-		my ($success, $choosen)=choose($zconf{defaultChooser});
-		if($success){
-			#check if the choosen has a legit name
-			#if it does not, set it to default
-			if(setNameLegit($choosen)){
-				$args{default}=$choosen;
-			}else{
-				$args{default}="default";
-			};
-		}else{
-			$args{default}="default";
-		};
-	}else{
-		if(defined($zconf{default})){
-			$args{default}=$zconf{default};
-		}else{
-			$args{default}="default";
-		};
-	};
-		
-	#get what the file only arg should be
-	#this is a Perl boolean value
-	if(!defined($zconf{fileonly})){
-		$args{fileonly}="0";
-	}else{
-		$args{fileonly}=$zconf{fileonly};
-	};
-
-	if($args{fileonly} eq "0"){
-		#gets what the backend should be using backendChooser
-		#if not defined, check for backend and if that is not
-		#defined, just use the file backend
-		if(defined($zconf{backendChooser})){
-			my ($success, $choosen)=choose($zconf{backendChooser});
-			if($success){
-				$args{backend}=$choosen;
-			}else{
-				if(defined{$zconf{backend}}){
-					$args{backend}=$zconf{backend};
-				}else{
-					$args{backend}="file";
-				};				
-			};
-		}else{
-			if(defined($zconf{backend})){
-				$args{backend}=$zconf{backend};
-			}else{
-				$args{backend}="file";
-			};
-		};
-	}else{
-		$args{backend}="file";
-	};
-		
-	#make sure the backend is legit
-	my @backends=("file", "ldap");
-	my $backendLegit=0;
-	my $backendsInt=0;
-	while(defined($backends[$backendsInt])){
-		if ($backends[$backendsInt] eq $args{backend}){
-			$backendLegit=1;
-		};
-
-		$backendsInt++;
-	};
-
-	if(!$backendLegit){
-		print "zconf new error: The backend '".$args{backend}."' is not a recognized backend.\n";
-		return undef;
-	};
-		
-	#real in the LDAP settings
-	if($args{backend} eq "ldap"){
-		#figures out what profile to use
-		if(defined($zconf{LDAPprofileChooser})){
-			#run the chooser to get the LDAP profile to use
-			my ($success, $choosen)=choose($zconf{LDAPprofileChooser});
-			#if the chooser fails, set the profile to default
-			if(!$success){
-				$args{LDAPprofile}="default";
-			}else{
-				$args{LDAPprofile}=$choosen;
-			};
-		}else{
-			#if LDAPprofile is defined, use it, if not set it to default
-			if(defined($zconf{LDAPprofile})){
-				$args{LDAPprofile}=$zconf{LDAPprofile};
-			}else{
-				$args{LDAPprofile}="default";
-			};
-		};
-
-		#gets the host
-		if(defined($zconf{"ldap/".$args{LDAPprofile}."/host"})){
-			$args{"ldap/host"}=$zconf{"ldap/".$args{LDAPprofile}."/host"};
-		}else{
-			#sets it to localhost if not defined
-			$args{"ldap/host"}="127.0.0.1"
-		};
-
-		#gets the host
-		if(defined($zconf{"ldap/".$args{LDAPprofile}."/password"})){
-			$args{"ldap/password"}=$zconf{"ldap/".$args{LDAPprofile}."/password"};
-		}else{
-			#sets it to localhost if not defined
-			$args{"ldap/password"}="";
-		};
-
-		#gets bind to use
-		if(defined($zconf{"ldap/".$args{LDAPprofile}."/bind"})){
-			$args{"ldap/bind"}=$zconf{"ldap/".$args{LDAPprofile}."/bind"};
-		}else{
-			$args{"ldap/bind"}=`hostname`;
-			chomp($args{"ldap/bind"});
-			#the next three lines can result in double comas.
-			$args{"ldap/bind"}=~s/^.*\././ ;
-			$args{"ldap/bind"}=~s/\./,dc=/g ;
-			$args{"ldap/bind"}="uid=".$ENV{USER}.",ou=users,".$args{"ldap/bind"};
-			#remove any double comas if they crop up
-			$args{"ldap/bind"}=~s/,,/,/g; 
-		};
-
-		#gets bind to use
-		if(defined($zconf{"ldap/".$args{LDAPprofile}."/homeDN"})){
-			$args{"ldap/homeDN"}=$zconf{"ldap/".$args{LDAPprofile}."/homeDN"};
-		}else{
-			$args{"ldap/homeDN"}=`hostname`;
-			chomp($args{"ldap/bind"});
-			#the next three lines can result in double comas.
-			$args{"ldap/homeDN"}=~s/^.*\././ ;
-			$args{"ldap/homeDN"}=~s/\./,dc=/g ;
-			$args{"ldap/homeDN"}="ou=".$ENV{USER}.",ou=home,".$args{"ldap/bind"};
-			#remove any double comas if they crop up
-			$args{"ldap/homeDN"}=~s/,,/,/g; 
-		};
-
-		#this holds the DN that is the base for everything done
-		$args{"ldap/base"}="ou=zconf,ou=.config,".$args{"ldap/homeDN"};
-		
-		#tests the connection
-		my $ldap;
-		eval {
-   			$ldap =
-				Net::LDAP::Express->new(host => $args{"ldap/host"},
-				bindDN => $args{"ldap/bind"},
-				bindpw => $args{"ldap/password"},
-				base   => $args{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-		} ;
-		if($@){
-			warn("zconf ldap init error:".$@);
-		};
-
-		#tests if "ou=.config,".$args{"ldap/homeDN"} exists or nnot...
-		#if it does not, try to create it...
-		my $ldapmesg=$ldap->search(scope=>"base", base=>"ou=.config,".$args{"ldap/homeDN"},
-								filter => "(objectClass=*)");
-		my %hashedmesg=LDAPhash($ldapmesg);
-		if(!defined($hashedmesg{"ou=.config,".$args{"ldap/homeDN"}})){
-			my $entry = Net::LDAP::Entry->new();
-			$entry->dn("ou=.config,".$args{"ldap/homeDN"});
-			$entry->add(objectClass => [ "top", "organizationalUnit" ], ou=>".config");
-			my $result = $ldap->update($entry);
-			if($ldap->error()){
-		    	warn("zconf ldap init error: ".$args{"ldap/base"}." ".$ldap->error.
-         				"; code ",$ldap->errcode);
-       			return undef;
-			};
-		};
-
-		#tests if "ldap/base" exists... try to create it if it does not
-		$ldapmesg=$ldap->search(scope=>"base", base=>$args{"ldap/base"},filter => "(objectClass=*)");
-		%hashedmesg=LDAPhash($ldapmesg);
-		if(!defined($hashedmesg{$args{"ldap/base"}})){
-			my $entry = Net::LDAP::Entry->new();
-			$entry->dn($args{"ldap/base"});
-			$entry->add(objectClass => [ "top", "organizationalUnit" ], ou=>"zconf");
-			my $result = $ldap->update($entry);
-			if($ldap->error()){
-		    	warn("zconf ldap init error: ".$args{"ldap/base"}." ".$ldap->error.
-         				"; code ",$ldap->errcode);
-       			return undef;
-			};
-		};
-		
-		#disconnects from the LDAP server
-		$ldap->unbind;
 	};
 
 	#The thing that will be returned.
@@ -316,10 +86,264 @@ sub new {
 	#     to help minimize it...
 	#error this is undef if, otherwise it is a integer for the error in question
 	#errorString this is a string describing the error
-	my $self = {conf=>{}, args=>{%args}, set=>{}, zconf=>{%zconf}, user=>{}, error=>undef,
+	my $self = {conf=>{}, args=>{%args}, set=>{}, zconf=>{}, user=>{}, error=>undef,
 				errorString=>""};
-
 	bless $self;
+
+	if (defined($self->{args}{file}) && defined($self->{args}{sysmode})) {
+		warn('ZConf new:35: sys and file can not be specified together');
+		$self->{error}=35;
+		$self->{errorString}='sys and file can not be specified together';
+		return undef;
+	}
+
+	#sets the base directory
+	if (!defined($self->{args}{sys})) {
+		$self->{args}{base}=xdg_config_home()."/zconf/";
+	}else {
+		$self->{args}{base}=$self->{args}{sys}."/zconf/";
+	}
+
+	#set the config file if it is not already set
+	if(!defined($self->{args}{file})){
+		$self->{args}{file}=$self->{args}{base}."/zconf.zml";
+		#Make the config file if it does not exist.
+		#We don't create it if it is manually specified as we assume
+		#that the caller manually specified it for some reason.
+		if(!-f $self->{args}{file}){
+			if(open("CREATECONFIG", '>', $self->{args}{file})){
+				print CREATECONFIG "fileonly=1\nreadfallthrough=1\n";
+				close("CREATECONFIG");
+			}else{
+				print "zconf new error: '".$self->{args}{file}."' could not be opened.\n";
+				return undef;
+			};
+		};
+	};
+
+	#do something if the base directory does not exist
+	if(! -d $self->{args}{base}){
+		#if the base diretory can not be created, exit
+		if(!mkdir($self->{args}{base})){
+			print "zconf new error: '".$self->{args}{base}.
+			      "' does not exist and could not be created.\n";
+			return undef;
+		};		
+	};
+
+	my $zconfzmlstring="";#holds the contents of zconf.zml
+	#returns undef if it can't read zconf.zml
+	if(open("READZCONFZML", $self->{args}{file})){
+		$zconfzmlstring=join("", <READZCONFZML>);
+		my $tempstring;
+		close("READZCONFZML");
+	}else{
+		print "zconf new error: Could not open'".$self->{args}{file}."\n";
+		return undef;
+	};
+
+	#tries to parse the zconf.zml
+	my $zml=ZML->new();
+	$zml->parse($zconfzmlstring);
+	if($zml->{error}){
+		warn("ZConf new:28: ZML->parse error, '".$zml->{error}."', '".$zml->{errorString}."'.");
+		return undef;
+	};
+	$self->{zconf}=$zml->{var};
+
+	#if defaultChooser is defined, use it to find what the default should be
+	if(defined($self->{zconf}{defaultChooser})){
+		#runs choose if it is defined
+		my ($success, $choosen)=choose($self->{zconf}{defaultChooser});
+		if($success){
+			#check if the choosen has a legit name
+			#if it does not, set it to default
+			if(setNameLegit($choosen)){
+				$self->{args}{default}=$choosen;
+			}else{
+				$self->{args}{default}="default";
+			};
+		}else{
+			$self->{args}{default}="default";
+		};
+	}else{
+		if(defined($self->{zconf}{default})){
+			$self->{args}{default}=$self->{zconf}{default};
+		}else{
+			$self->{args}{default}="default";
+		};
+	};
+		
+	#get what the file only arg should be
+	#this is a Perl boolean value
+	if(!defined($self->{zconf}{fileonly})){
+		$self->{zconf}->{args}{fileonly}="0";
+	}else{
+		$self->{args}{fileonly}=$self->{zconf}{fileonly};
+	};
+
+	if($self->{args}{fileonly} eq "0"){
+		#gets what the backend should be using backendChooser
+		#if not defined, check for backend and if that is not
+		#defined, just use the file backend
+		if(defined($self->{zconf}{backendChooser})){
+			my ($success, $choosen)=choose($self->{zconf}{backendChooser});
+			if($success){
+				$self->{args}{backend}=$choosen;
+			}else{
+				if(defined{$self->{zconf}{backend}}){
+					$self->{args}{backend}=$self->{zconf}{backend};
+				}else{
+					$self->{args}{backend}="file";
+				};				
+			};
+		}else{
+			if(defined($self->{zconf}{backend})){
+				$self->{args}{backend}=$self->{zconf}{backend};
+			}else{
+				$self->{args}{backend}="file";
+			};
+		};
+	}else{
+		$self->{args}{backend}="file";
+	};
+		
+	#make sure the backend is legit
+	my @backends=("file", "ldap");
+	my $backendLegit=0;
+	my $backendsInt=0;
+	while(defined($backends[$backendsInt])){
+		if ($backends[$backendsInt] eq $self->{args}{backend}){
+			$backendLegit=1;
+		};
+
+		$backendsInt++;
+	};
+
+	if(!$backendLegit){
+		warn("zconf new error: The backend '".$self->{args}{backend}.
+			 "' is not a recognized backend.\n");
+		return undef;
+	};
+		
+	#real in the LDAP settings
+	if($self->{args}{backend} eq "ldap"){
+		#figures out what profile to use
+		if(defined($self->{zconf}{LDAPprofileChooser})){
+			#run the chooser to get the LDAP profile to use
+			my ($success, $choosen)=choose($self->{zconf}{LDAPprofileChooser});
+			#if the chooser fails, set the profile to default
+			if(!$success){
+				$self->{args}{LDAPprofile}="default";
+			}else{
+				$self->{args}{LDAPprofile}=$choosen;
+			};
+		}else{
+			#if LDAPprofile is defined, use it, if not set it to default
+			if(defined($self->{zconf}{LDAPprofile})){
+				$self->{args}{LDAPprofile}=$self->{zconf}{LDAPprofile};
+			}else{
+				$self->{args}{LDAPprofile}="default";
+			};
+		};
+
+		#gets the host
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/host"})){
+			$self->{args}{"ldap/host"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/host"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/host"}="127.0.0.1"
+		};
+
+		#gets the host
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"})){
+			$self->{args}{"ldap/password"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/password"}="";
+		};
+
+		#gets bind to use
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/bind"})){
+			$self->{args}{"ldap/bind"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/bind"};
+		}else{
+			$self->{args}{"ldap/bind"}=`hostname`;
+			chomp($self->{args}{"ldap/bind"});
+			#the next three lines can result in double comas.
+			$self->{args}{"ldap/bind"}=~s/^.*\././ ;
+			$self->{args}{"ldap/bind"}=~s/\./,dc=/g ;
+			$self->{args}{"ldap/bind"}="uid=".$ENV{USER}.",ou=users,".$self->{args}{"ldap/bind"};
+			#remove any double comas if they crop up
+			$self->{args}{"ldap/bind"}=~s/,,/,/g;
+		};
+
+		#gets bind to use
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/homeDN"})){
+			$self->{args}{"ldap/homeDN"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/homeDN"};
+		}else{
+			$self->{args}{"ldap/homeDN"}=`hostname`;
+			chomp($self->{args}{"ldap/bind"});
+			#the next three lines can result in double comas.
+			$self->{args}{"ldap/homeDN"}=~s/^.*\././ ;
+			$self->{args}{"ldap/homeDN"}=~s/\./,dc=/g ;
+			$self->{args}{"ldap/homeDN"}="ou=".$ENV{USER}.",ou=home,".$self->{args}{"ldap/bind"};
+			#remove any double comas if they crop up
+			$self->{args}{"ldap/homeDN"}=~s/,,/,/g;
+		};
+
+		#this holds the DN that is the base for everything done
+		$self->{args}{"ldap/base"}="ou=zconf,ou=.config,".$self->{args}{"ldap/homeDN"};
+		
+		#tests the connection
+		my $ldap;
+		eval {
+   			$ldap =
+				Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
+				bindDN => $self->{args}{"ldap/bind"},
+				bindpw => $self->{args}{"ldap/password"},
+				base   => $self->{args}{"ldap/homeDN"},
+				searchattrs => [qw(dn)]);
+		} ;
+		if($@){
+			warn("zconf ldap init error:".$@);
+		};
+
+		#tests if "ou=.config,".$self->{args}{"ldap/homeDN"} exists or nnot...
+		#if it does not, try to create it...
+		my $ldapmesg=$ldap->search(scope=>"base", base=>"ou=.config,".$self->{args}{"ldap/homeDN"},
+								filter => "(objectClass=*)");
+		my %hashedmesg=LDAPhash($ldapmesg);
+		if(!defined($hashedmesg{"ou=.config,".$self->{args}{"ldap/homeDN"}})){
+			my $entry = Net::LDAP::Entry->new();
+			$entry->dn("ou=.config,".$self->{args}{"ldap/homeDN"});
+			$entry->add(objectClass => [ "top", "organizationalUnit" ], ou=>".config");
+			my $result = $ldap->update($entry);
+			if($ldap->error()){
+		    	warn("zconf ldap init error: ".$self->{args}{"ldap/base"}." ".$ldap->error.
+         				"; code ",$ldap->errcode);
+       			return undef;
+			};
+		};
+
+		#tests if "ldap/base" exists... try to create it if it does not
+		$ldapmesg=$ldap->search(scope=>"base", base=>$self->{args}{"ldap/base"},filter => "(objectClass=*)");
+		%hashedmesg=LDAPhash($ldapmesg);
+		if(!defined($hashedmesg{$self->{args}{"ldap/base"}})){
+			my $entry = Net::LDAP::Entry->new();
+			$entry->dn($self->{args}{"ldap/base"});
+			$entry->add(objectClass => [ "top", "organizationalUnit" ], ou=>"zconf");
+			my $result = $ldap->update($entry);
+			if($ldap->error()){
+		    	warn("zconf ldap init error: ".$self->{args}{"ldap/base"}." ".$ldap->error.
+         				"; code ",$ldap->errcode);
+       			return undef;
+			};
+		};
+		
+		#disconnects from the LDAP server
+		$ldap->unbind;
+	};
+
 	return $self;
 };
 
@@ -3907,6 +3931,10 @@ Unable to remove the config as it has sub configs.
 
 LDAP connection error
 
+=head2 35
+
+Can't use system mode and file together.
+
 =head1 ERROR CHECKING
 
 This can be done by checking $zconf->{error} to see if it is defined. If it is defined,
@@ -4037,6 +4065,12 @@ This is the password to use for when connecting to the server.
 		DESC 'A zconf entry.'
 		MAY ( cn $ zconfData $ zconfChooser $ zconfSet )
 		)
+
+=head1 SYSTEM MODE
+
+This is for deamons or the like. This will read
+'/var/db/zconf/$sys/zconf.zml' for it's options and store
+the file backend stuff in '/var/db/zconf/$sys/zconf/'.
 
 =head1 UTILITIES
 
@@ -4197,7 +4231,7 @@ L<http://search.cpan.org/dist/ZConf>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Zane C. Bowers, all rights reserved.
+Copyright 2009 Zane C. Bowers, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
