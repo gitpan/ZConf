@@ -1,5 +1,9 @@
 Revision history for ZConf
 
+1.1.1	2009-05-07/00:30
+		-defaultSetExists now actually works instead of always returning true.
+		-setExists will now use defaultSetExists if no set is specified.
+
 1.1.0	2009-04-12/14:30
 		-Implement system mode.
 		-New cleanup.

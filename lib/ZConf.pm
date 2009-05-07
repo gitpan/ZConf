@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 1.1.0
+Version 1.1.1
 
 =cut
 
-our $VERSION = '1.1.0';
+our $VERSION = '1.1.1';
 
 =head1 SYNOPSIS
 
@@ -859,7 +859,23 @@ sub defaultSetExists{
 		return undef;
 	}
 
-	return 1;
+	#get the available sets to check if the default exists
+	my @sets=$self->getAvailableSets($config);
+	if ($self->{error}) {
+		warn('ZConf defaultSetExists: getAvailableSets errored');
+		return undef;
+	}
+
+	#check for one that matches...
+	my $int=0;
+	while (defined($sets[$int])) {
+		if ($set eq $sets[$int]) {
+			return 1;
+		}
+		$int++;
+	}
+
+	return undef;
 }
 
 =head2 delConfig
@@ -2287,6 +2303,9 @@ sub readChooser{
 
 =head2 readChooserFile
 
+
+
+
 This functions just like readChooser, but functions on the file backend
 and only really intended for internal use.
 
@@ -2584,7 +2603,8 @@ sub setDefault{
 This checks if the specified set exists.
 
 Two arguements are required. The first arguement is the name of the config.
-The second arguement is the name of the set.
+The second arguement is the name of the set. If no set is specified, the default
+set is used. This is done by calling 'defaultSetExists'.
 
     if($zconf->setExists("foo/bar", "fubar")){
         print "It exists.\n";
@@ -2607,6 +2627,15 @@ sub setExists{
 
 	#blank any errors
 	$self->errorBlank;
+
+	#this will get what set to use if it is not specified
+	if (!defined($set)) {
+		return $self->defaultSetExists($config);
+		if ($self->{error}) {
+			warn('ZConf setExists: No set specified and defaultSetExists errored');
+			return undef;
+		}
+	}
 
 	#We don't do any config name checking here or even if it exists as getAvailableSets
 	#will do that.
