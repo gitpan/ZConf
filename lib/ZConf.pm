@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 1.1.1
+Version 1.2.0
 
 =cut
 
-our $VERSION = '1.1.1';
+our $VERSION = '1.2.0';
 
 =head1 SYNOPSIS
 
@@ -101,7 +101,43 @@ sub new {
 	if (!defined($self->{args}{sys})) {
 		$self->{args}{base}=xdg_config_home()."/zconf/";
 	}else {
-		$self->{args}{base}=$self->{args}{sys}."/zconf/";
+		$self->{args}{base}='/var/db/zconf/'.$self->{args}{sys};
+
+		#make sure it will only be one directory
+		if ($self->{args}{sys} =~ /\//) {
+				$self->{error}='38';
+				$self->{errorString}='Sys name,"'.$self->{args}{base}.'", matches /\//';
+				warn('ZConf new:38: '.$self->{errorString});
+				return $self;
+		}
+
+		#make sure it is not hidden
+		if ($self->{args}{sys} =~ /\./) {
+				$self->{error}='39';
+				$self->{errorString}='Sys name,"'.$self->{args}{base}.'", matches /\./';
+				warn('ZConf new:39: '.$self->{errorString});
+				return $self;
+		}
+
+		#make sure the system directory exists
+		if (!-d '/var/db/zconf') {
+			if (!mkdir('/var/db/zconf')) {
+				$self->{error}='36';
+				$self->{errorString}='Could not create "/var/db/zconf/"';
+				warn('ZConf new:36: '.$self->{errorString});
+				return $self;
+			}
+		}
+
+		#make sure the 
+		if (!-d $self->{args}{base}) {
+			if (!mkdir($self->{args}{base})) {
+				$self->{error}='37';
+				$self->{errorString}='Could not create "'.$self->{args}{base}.'"';
+				warn('ZConf new:37: '.$self->{errorString});
+				return $self;
+			}
+		}
 	}
 
 	#set the config file if it is not already set
@@ -3964,6 +4000,22 @@ LDAP connection error
 
 Can't use system mode and file together.
 
+=head2 36
+
+Could not create '/var/db/zconf'. This is a permanent error.
+
+=head2 37
+
+Could not create '/var/db/zconf/<sys name>'. This is a permanent error.
+
+=head2 38
+
+Sys name matched /\//.
+
+=head2 39
+
+Sys name matched /\./.
+
 =head1 ERROR CHECKING
 
 This can be done by checking $zconf->{error} to see if it is defined. If it is defined,
@@ -4099,7 +4151,10 @@ This is the password to use for when connecting to the server.
 
 This is for deamons or the like. This will read
 '/var/db/zconf/$sys/zconf.zml' for it's options and store
-the file backend stuff in '/var/db/zconf/$sys/zconf/'.
+the file backend stuff in '/var/db/zconf/$sys/'.
+
+It will create '/var/db/zconf' or the sys directory, but not
+'/var/db'.
 
 =head1 UTILITIES
 

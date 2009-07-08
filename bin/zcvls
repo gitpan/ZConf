@@ -31,7 +31,7 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 #version function
 sub main::VERSION_MESSAGE {
-	print "zcvls 0.0.0\n";
+	print "zcvls 0.1.0\n";
 }
 
 #print help
@@ -39,12 +39,13 @@ sub main::HELP_MESSAGE {
 	print "\n".
 	      "-c <config>  The config to operate on.\n".
 		  "-s <set>  The set to operate on.\n".
-		  "-k <key>  The key to be operated on.\n";
+		  "-k <key>  The key to be operated on.\n".
+		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:k:', \%opts);
+getopts('s:c:k:S:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
@@ -60,7 +61,7 @@ if (!defined($opts{k})) {
 #if -f is set, read it
 
 #inits zconf
-my $zconf = ZConf->new();
+my $zconf = ZConf->new({sys=>$opts{S}});
 if($zconf->{error}){
 	exit 1;
 }
@@ -145,7 +146,11 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =head1 Changelog
 
-=head2 2008-10-06/2:55
+=head2 2009-07-08/1:00 0.1.0
+
+Add sys mode.
+
+=head2 2008-10-06/2:55 0.0.0
 
 Initial release.
 

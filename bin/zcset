@@ -31,7 +31,7 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 #version function
 sub main::VERSION_MESSAGE {
-	print "zcset 0.0.1\n";
+	print "zcset 0.1.0\n";
 }
 
 #print help
@@ -41,12 +41,13 @@ sub main::HELP_MESSAGE {
 		  "-s <set>  The set to operate on.\n".
 		  "-k <key>  The key to be operated on.\n".
 		  "-v <value>  The value to set it to.\n".
-		  "-f <file>  The file to read and set it to.\n";
+		  "-f <file>  The file to read and set it to.\n".
+		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:k:v:f:', \%opts);
+getopts('s:c:k:v:f:S:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
@@ -75,7 +76,7 @@ if ((defined($opts{v})) && (defined($opts{f}))) {
 #if -f is set, read it
 
 #inits zconf
-my $zconf = ZConf->new();
+my $zconf = ZConf->new({sys=>$opts{S}});
 if($zconf->{error}){
 	exit 1;
 }
@@ -165,6 +166,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =head1 Changelog
+
+=head2 2009-07-08/1:00 0.1.0
+
+Add sys mode.
 
 =head2 2008-10-06/3:00 0.0.1
 

@@ -31,19 +31,20 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 #version function
 sub main::VERSION_MESSAGE {
-	print "zccreate 0.0.0\n";
+	print "zccreate 0.1.0\n";
 }
 
 #print help
 sub main::HELP_MESSAGE {
 	print "\n".
 	      "-c <config>  Show the sub configs of a specified config.\n".
-		  "-s <set>  Show sets of a specified config.\n";
+		  "-s <set>  Show sets of a specified config.\n".
+		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:', \%opts);
+getopts('s:c:S:', \%opts);
 
 if (!defined($opts{c})) {
 	warn('zccreate: -c not defined');
@@ -51,7 +52,7 @@ if (!defined($opts{c})) {
 }
 
 #inits zconf
-my $zconf = ZConf->new();
+my $zconf = ZConf->new({sys=>$opts{S}});
 if($zconf->{error}){
 	warn("zccron:1: Could not initiate ZConf. It failed with '".$zconf->{error}."'".
 		", '".$zconf->{errorString}."'");
@@ -120,6 +121,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =head1 Changelog
+
+=head2 2009-07-08/1:00 0.1.0
+
+Add sys mode.
 
 =head2 2008-10-06/00:37
 
