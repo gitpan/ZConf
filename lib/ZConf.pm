@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 1.2.0
+Version 1.2.1
 
 =cut
 
-our $VERSION = '1.2.0';
+our $VERSION = '1.2.1';
 
 =head1 SYNOPSIS
 
@@ -142,7 +142,7 @@ sub new {
 
 	#set the config file if it is not already set
 	if(!defined($self->{args}{file})){
-		$self->{args}{file}=$self->{args}{base}."/zconf.zml";
+		$self->{args}{file}=xdg_config_home()."/zconf.zml";
 		#Make the config file if it does not exist.
 		#We don't create it if it is manually specified as we assume
 		#that the caller manually specified it for some reason.
