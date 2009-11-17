@@ -16,11 +16,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 1.3.0
+Version 1.3.1
 
 =cut
 
-our $VERSION = '1.3.0';
+our $VERSION = '1.3.1';
 
 =head1 SYNOPSIS
 
@@ -288,6 +288,46 @@ sub new {
 		}else{
 			#sets it to localhost if not defined
 			$self->{args}{"ldap/host"}="127.0.0.1"
+		};
+
+		#gets the capath
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/capath"})){
+			$self->{args}{"ldap/capath"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/capath"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/capath"}=undef;
+		};
+
+		#gets the cafile
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/cafile"})){
+			$self->{args}{"ldap/cafile"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/cafile"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/cafile"}=undef;
+		};
+
+		#gets the checkcrl
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/checkcrl"})){
+			$self->{args}{"ldap/checkcrl"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/checkcrl"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/checkcrl"}=undef;
+		};
+
+		#gets the clientcert
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientcert"})){
+			$self->{args}{"ldap/clientcert"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientcert"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/clientcert"}=undef;
+		};
+
+		#gets the clientkey
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientkey"})){
+			$self->{args}{"ldap/clientkey"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientkey"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/clientkey"}=undef;
 		};
 
 		#gets the starttls
@@ -1867,6 +1907,11 @@ sub LDAPconnect{
 							   verify=>$self->{args}{'larc/TLSverify'},
 							   sslversion=>$self->{args}{'ldap/SSLversion'},
 							   ciphers=>$self->{args}{'ldap/SSLciphers'},
+							   cafile=>$self->{args}{'ldap/cafile'},
+							   capath=>$self->{args}{'ldap/capath'},
+							   checkcrl=>$self->{args}{'ldap/checkcrl'},
+							   clientcert=>$self->{args}{'ldap/clientcert'},
+							   clientkey=>$self->{args}{'ldap/clientkey'},
 							   );
 
 		if (!$mesg->{errorMessage} eq '') {
@@ -4164,6 +4209,37 @@ will be used for the profile.
 =head3 ldap/<profile>/bind
 
 This is the DN to bind to the server as.
+
+=head3 cafile
+
+When verifying the server's certificate, either set capath to the pathname of the directory containing
+CA certificates, or set cafile to the filename containing the certificate of the CA who signed the
+server's certificate. These certificates must all be in PEM format.
+
+=head3 capath
+
+The directory in 'capath' must contain certificates named using the hash value of the certificates'
+subject names. To generate these names, use OpenSSL like this in Unix:
+
+    ln -s cacert.pem `openssl x509 -hash -noout < cacert.pem`.0
+
+(assuming that the certificate of the CA is in cacert.pem.)
+
+=head3 checkcrl
+
+If capath has been configured, then it will also be searched for certificate revocation lists (CRLs)
+when verifying the server's certificate. The CRLs' names must follow the form hash.rnum where hash
+is the hash over the issuer's DN and num is a number starting with 0.
+
+=head3 clientcert
+
+This client cert to use.
+
+=head3 clientkey
+
+The client key to use.
+
+Encrypted keys are not currently supported at this time.
 
 =head3 ldap/<profile>/homeDN
 
