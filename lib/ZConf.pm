@@ -1,7 +1,6 @@
 package ZConf;
 
 use Net::LDAP;
-use Net::LDAP::Express;
 use Net::LDAP::LDAPhash;
 use Net::LDAP::Makepath;
 use File::Path;
@@ -17,11 +16,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 1.2.1
+Version 1.3.0
 
 =cut
 
-our $VERSION = '1.2.1';
+our $VERSION = '1.3.0';
 
 =head1 SYNOPSIS
 
@@ -39,7 +38,7 @@ on error, syncing between backends, and listing of configs.
 
 =head2 new
 
-	my $zconf=ZCnf->(%args);
+	my $zconf=ZConf->(\%args);
 
 This initiates the ZConf object. If it can't be initiated, a value of undef
 is returned. The hash can contain various initization options.
@@ -87,7 +86,7 @@ sub new {
 	#error this is undef if, otherwise it is a integer for the error in question
 	#errorString this is a string describing the error
 	my $self = {conf=>{}, args=>{%args}, set=>{}, zconf=>{}, user=>{}, error=>undef,
-				errorString=>""};
+				errorString=>"", module=>__PACKAGE__};
 	bless $self;
 
 	if (defined($self->{args}{file}) && defined($self->{args}{sysmode})) {
@@ -291,12 +290,44 @@ sub new {
 			$self->{args}{"ldap/host"}="127.0.0.1"
 		};
 
-		#gets the host
+		#gets the starttls
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/starttls"})){
+			$self->{args}{"ldap/starttls"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/starttls"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/starttls"}=undef;
+		};
+
+		#gets the TLSverify
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/TLSverify"})){
+			$self->{args}{"ldap/TLSverify"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/TLSverify"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/TLSverify"}='none';
+		};
+
+		#gets the SSL version to use
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLversion"})){
+			$self->{args}{"ldap/SSLversion"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLversion"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/SSLversion"}='tlsv1';
+		};
+
+		#gets the SSL ciphers to use
+		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLciphers"})){
+			$self->{args}{"ldap/SSLciphers"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLciphers"};
+		}else{
+			#sets it to localhost if not defined
+			$self->{args}{"ldap/SSLciphers"}='ALL';
+		};
+
+		#gets the password value to use
 		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"})){
 			$self->{args}{"ldap/password"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"};
 		}else{
 			#sets it to localhost if not defined
-			$self->{args}{"ldap/password"}="";
+			$self->{args}{"ldap/starttls"}="";
 		};
 
 		#gets bind to use
@@ -331,18 +362,11 @@ sub new {
 		$self->{args}{"ldap/base"}="ou=zconf,ou=.config,".$self->{args}{"ldap/homeDN"};
 		
 		#tests the connection
-		my $ldap;
-		eval {
-   			$ldap =
-				Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-		} ;
-		if($@){
-			warn("zconf ldap init error:".$@);
-		};
+		my $ldap=$self->LDAPconnect;
+		if ($self->{error}) {
+			warn('ZConf new: LDAPconnect errored');
+			return undef;
+		}
 
 		#tests if "ou=.config,".$self->{args}{"ldap/homeDN"} exists or nnot...
 		#if it does not, try to create it...
@@ -393,7 +417,10 @@ chooser string, it uses the value the default set.
 
 It takes one arguement, which is the configuration it is for.
 
-	my $set=$zconf->chooseSet("foo/bar")
+If the chooser errors, is blank, or is just a newline, the default is
+returned.
+
+	my $set=$zconf->chooseSet("foo/bar");
 
 =cut
 
@@ -411,8 +438,16 @@ sub chooseSet{
 		return undef;
 	};
 
-
 	my $chooserstring=$self->readChooser($config);
+
+	#makes sure it is not blank
+	if ($chooserstring eq '') {
+		return $self->{args}{default};
+	}
+	#makes sure it is not just a new line
+	if ($chooserstring eq "\n") {
+		return $self->{args}{default};
+	}
 	
 	my ($success, $choosen)=choose($chooserstring);
 	
@@ -1807,24 +1842,53 @@ This generates a Net::LDAP object based on the LDAP backend.
 
 sub LDAPconnect{
 	my $self=$_[0];
+	my $function='LDAPconnect';
 
 	$self->errorBlank;
 
 	#connects up to LDAP
-	my $ldap;
-	eval {
-   		$ldap =Net::LDAP::Express->new(host => $self->{args}{"ldap/host"},
-				bindDN => $self->{args}{"ldap/bind"},
-				bindpw => $self->{args}{"ldap/password"},
-				base   => $self->{args}{"ldap/homeDN"},
-				searchattrs => [qw(dn)]);
-	};
-	if($@){
-		warn("zconf LDAPconnect:1: LDAP connection failed with '".$@."'.");
+	my $ldap=Net::LDAP->new(
+							$self->{args}{"ldap/host"},
+							port=>$self->{args}{"ldap/port"},
+							);
+
+	#make sure we connected
+	if (!$ldap) {
 		$self->{error}=1;
-		$self->{errorString}="LDAP connection failed with '".$@."'";
+		$self->{errorString}='Failed to connect to LDAP';
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
-	};
+	}
+
+	#start tls stuff if needed
+	my $mesg;
+	if ($self->{args}{"ldap/starttls"}) {
+		$mesg=$ldap->start_tls(
+							   verify=>$self->{args}{'larc/TLSverify'},
+							   sslversion=>$self->{args}{'ldap/SSLversion'},
+							   ciphers=>$self->{args}{'ldap/SSLciphers'},
+							   );
+
+		if (!$mesg->{errorMessage} eq '') {
+			$self->{error}=1;
+			$self->{errorString}='$ldap->start_tls failed. $mesg->{errorMessage}="'.
+			                     $mesg->{errorMessage}.'"';
+			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			return undef;
+		}
+	}
+
+	#bind
+	$mesg=$ldap->bind($self->{args}{"ldap/bind"},
+					  password=>$self->{args}{"ldap/password"},
+					  );
+	if (!$mesg->{errorMessage} eq '') {
+		$self->{error}=13;
+		$self->{errorString}='Binding to the LDAP server failed. $mesg->{errorMessage}="'.
+		                     $mesg->{errorMessage}.'"';
+		warn('Plugtools connect:13: '.$self->{errorString});
+		return undef;
+	}
 
 	return $ldap;
 }
@@ -2931,6 +2995,9 @@ config name. The second is chooser string.
 
 No error checking is done currently on the chooser string.
 
+Setting this to '' or "\n" will disable the chooser fuction
+and the default will be used when chooseSet is called.
+
 	#writes the contents of $chooserString to the chooser for "foo/bar"
 	if(!$zconf->writeChooser("foo/bar", $chooserString)){
 		print "it failed\n";
@@ -3188,12 +3255,12 @@ used.
 
 The second hash is the hash to be written to the config.
 
-	if(!$zconf->writeSetFromHash({config=>"foo/bar"}, %hash)){
+	if(!$zconf->writeSetFromHash({config=>"foo/bar"}, \%hash)){
 		print "'foo/bar' does not exist\n";
 	};
 
 	#does the same thing above, but using the error interface
-	my $returned = $zconf->writeSetFromHash({config=>"foo/bar"}, %hash)
+	my $returned = $zconf->writeSetFromHash({config=>"foo/bar"}, \%hash)
 	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -3269,12 +3336,12 @@ sub writeSetFromHash{
 This function is intended for internal use only and functions exactly like
 writeSetFromHash, but functions just on the file backend.
 
-	if(!$zconf->writeSetFromHashFile({config=>"foo/bar"}, %hash)){
+	if(!$zconf->writeSetFromHashFile({config=>"foo/bar"}, \%hash)){
 		print "'foo/bar' does not exist\n";
 	};
 
 	#does the same thing above, but using the error interface
-	my $returned = $zconf->writeSetFromHashFile({config=>"foo/bar"}, %hash)
+	my $returned = $zconf->writeSetFromHashFile({config=>"foo/bar"}, \%hash)
 	if($zconf->{error}){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -3361,12 +3428,12 @@ sub writeSetFromHashFile{
 This function is intended for internal use only and functions exactly like
 writeSetFromHash, but functions just on the LDAP backend.
 
-	if(!$zconf->writeSetFromHashLDAP({config=>"foo/bar"}, %hash)){
+	if(!$zconf->writeSetFromHashLDAP({config=>"foo/bar"}, \%hash)){
 		print "'foo/bar' does not exist\n";
 	};
 
 	#does the same thing above, but using the error interface
-	my $returned = $zconf->writeSetFromHashLDAP({config=>"foo/bar"}, %hash)
+	my $returned = $zconf->writeSetFromHashLDAP({config=>"foo/bar"}, \%hash)
 	if(defined($zconf->{error})){
 		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
 	};
@@ -4111,6 +4178,26 @@ This is the server to use for LDAP connections.
 
 This is the password to use for when connecting to the server.
 
+=head3 ldap/<profile>/starttls
+
+This is if it should use starttls or not. It defaults to undefined, 'false'.
+
+=head3 ldap/<profile>/SSLciphers
+
+This is a list of ciphers to accept. The string is in the standard OpenSSL
+format. The default value is 'ALL'.
+
+=head3 ldap/<profile>/SSLversion
+
+This is the SSL versions accepted.
+
+'sslv2', 'sslv3', 'sslv2/3', or 'tlsv1' are the possible values. The default
+is 'tlsv1'.
+
+=head3 ldap/<profile>/TLSverify
+
+The verify mode for TLS. The default is 'none'.
+
 =head1 ZConf LDAP Schema
 
 	# 1.3.6.1.4.1.26481 Zane C. Bowers
@@ -4119,6 +4206,7 @@ This is the password to use for when connecting to the server.
 	#    .0 zconfData
 	#    .1 zconfChooser
 	#    .2 zconfSet
+    #    .3 zconfRev
 	
 	attributeType ( 1.3.6.1.4.1.26481.2.7.0
 		NAME 'zconfData'
@@ -4141,10 +4229,17 @@ This is the password to use for when connecting to the server.
 		EQUALITY caseExactMatch
 		)
 
+    attributeType ( 1.3.6.1.4.1.26481.2.7.3
+        NAME 'zconfRev'
+        DESC 'The revision number for a ZConf config. Bumped with each update.'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+        EQUALITY caseExactMatch
+        )
+
 	objectclass ( 1.3.6.1.4.1.26481.2.7
 		NAME 'zconf'
 		DESC 'A zconf entry.'
-		MAY ( cn $ zconfData $ zconfChooser $ zconfSet )
+		MAY ( cn $ zconfData $ zconfChooser $ zconfSet $ zconfRev)
 		)
 
 =head1 SYSTEM MODE
@@ -4158,117 +4253,8 @@ It will create '/var/db/zconf' or the sys directory, but not
 
 =head1 UTILITIES
 
-These are installed with the module.
+There are several scripts installed with this module.
 
-=head2 zccreate
-
-Used for creating empty config or set.
-
-=head3 -c <config>
-
-The config to be created.
-
-=head3 -s <set>
-
-The set to be created. This is an optional option.
-
-=head2 zcget
-
-This fetches the value for a variable.
-
-=head3 -c <config>
-
-The config to be used for fetching the key.
-
-=head3 -k <key>
-
-This is the key to get.
-
-=head3 -n
-
-Do not print a newline.
-
-=head3 -s <set>
-
-The set to be created. If it is not specified, the default will
-be used.
-
-=head2 zcls
-
-This lists subconfigs.
-
-=head3 -c <config>
-
-The config to list the subconfigs of. If '-c ""' is used, it will
-show the base ones.
-
-=head3 -s
-
-IF this is specified, the sets of the config will be listed.
-
-=head2 zcrm
-
-This removes a config or set.
-
-=head3 -c <config>
-
-This is the config to be removed.
-
-=head3 -s <set>
-
-If this is specified, the config is not removed, but the specified set for
-the specified config.
-
-=head2 zcset
-
-This sets a specified value for a variable.
-
-=head3 -c <config>
-
-This is the config to be operated on.
-
-=head3 -k <variable>
-
-This is the key to set.
-
-=head3 -s <set>
-
-This is the set to operate on. If it is not defined, it will be default
-will be used.
-
-=head3 -v <value>
-
-The value of set the key to.
-
-=head2 zcvdel
-
-This deletes a variable.
-
-=head3 -c <config>
-
-This is the config to be operated on.
-
-=head3 -k <variable>
-
-This is the key to be removed.
-
-=head3 -s <set>
-
-This is the set to operate on. If it is not defined, it will be default
-will be used.
-
-=head2 zcvls
-
-This shows the variables in a config.
-
-=head3 -c <config>
-
-This is the config to be operated on.
-
-=head3 -s <set>
-
-This is the set to operate on. If it is not defined, it will be default
-will be used.
 
 =head1 AUTHOR
 

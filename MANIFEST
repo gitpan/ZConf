@@ -7,3 +7,14 @@ lib/ZConf.pm
 t/00-load.t
 t/pod-coverage.t
 t/pod.t
+bin/zcchooser-edit
+bin/zcchooser-get
+bin/zcchooser-run
+bin/zcchooser-set
+bin/zccreate
+bin/zcget
+bin/zcls
+bin/zcrm
+bin/zcset
+bin/zcvdel
+bin/zcvls

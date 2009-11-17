@@ -12,7 +12,6 @@ WriteMakefile(
     PREREQ_PM => {
         'Test::More' => 0,
         'Net::LDAP' => 0,
-        'Net::LDAP::Express' => 0,
         'Net::LDAP::LDAPhash' => 0,
         'Net::LDAP::Makepath' => 0,
         'File::Path' => 0,

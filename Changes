@@ -1,5 +1,19 @@
 Revision history for ZConf
 
+1.3.0   2009-11-17/06:40
+		-Update LDAP schema. 'zconfRev' is not in use yet, but will be in the
+			next release.
+		-Fix the '-f' flag for 'bin/zcset'.
+		-Correct the manifest.
+		-All the scripts are now executable.
+		-No longer uses 'Net::LDAP::Express'.
+		-starttls now supported for LDAP.
+		-Adds the the following scripts for working with the choosers.
+			bin/zcchooser-edit
+			bin/zcchooser-get
+			bin/zcchooser-run
+			bin/zcchooser-set
+
 1.2.1	2009-10-16/2:00
 		-Correct which file is being loaded.
 
