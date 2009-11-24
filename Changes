@@ -1,5 +1,74 @@
 Revision history for ZConf
 
+2.0.0	2009-11-23/20:00
+		-the writeFromHash functions now use ZML instead of creating
+			them manually. This makes it more robust as it is easier
+			add support in the future for what ever supported by ZML
+			and it does checking of the variable names.
+		-Add meta and comment support methods as listed below.
+			regexCommentDel
+			regexCommentGet
+			regexMetaDel
+			regexMetaGet
+			setComment
+			setMeta
+		-Add support for config revisions and support methods.
+			getConfigRevision
+			getConfigRevisionFile
+			getConfigRevisionLDAP
+			getLoadedConfigRevision
+		-Added update if change support methods.
+			getAutoupdate
+			setAutoupdate
+			reread
+			updatable
+			updateIfNeeded
+		-Added automatic rereading to the methods listed below.
+			getComments
+			getKeys
+			getMetas
+			regexCommentDel
+			regexCommentGet
+			regexMetaDel
+			regexMetaGet
+			regexVarDel
+			regexVarGet
+			regexVarSearch
+			setComment
+			setMeta
+			SetVar
+		-Add 'zconfRev' and 'zconfLock' to the LDAP schema.
+		-Add config locking and supporting methods.
+			setLockConfig
+			setLockConfigFile
+			setLockConfigLDAP
+			getLockedLoadedConfigs
+			isLoadedConfigLocked
+			isConfigLocked
+			isConfigLockedFile
+			isConfigLockedLDAP
+		-All backend related methods now call the backend
+			related methods for checking if a config exists
+			or not.
+		-Modified time support added. The meta $var='mtime'
+			is set to the UNIX time when it is changed. It can be
+			fetched using getMtime.
+		-Create time support added. The meta $var='ctime'
+			is set to the UNIX time when it was created. It can be
+			fetched using getCtime.
+		-Add ldap/<profile>/passwordfile support to zconf.zml.
+		-If a set name is not specified for writing to LDAP or the
+			file backend, it will now properly choose one. Previously
+			it only would if the generic ones were called.
+		-When syncing to file backend, it will now make sure the config
+			exists and if not it will be created.
+		-Lots of assorted POD cleanups.
+		-Add override support and the support methods listed below. override
+			is ran when ever readFile or readLDAP is called.
+				getOverrideChooser
+				override
+				setOverrideChooser
+
 1.3.1	2009-11-17/15:00
 		-Add misc ca and cert stuff that was forgotten about.
 

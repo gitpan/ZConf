@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#Copyright (c) 2008, Zane C. Bowers
+#Copyright (c) 2009, Zane C. Bowers
 #All rights reserved.
 #
 #Redistribution and use in source and binary forms, with or without modification,
@@ -31,15 +31,18 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 #version function
 sub main::VERSION_MESSAGE {
-	print "zcset 0.1.0\n";
+	print "zcset 1.0.0\n";
 }
 
 #print help
 sub main::HELP_MESSAGE {
 	print "\n".
 	      "-c <config>  The config to operate on.\n".
+		  "-C  Add a comment.\n".
 		  "-s <set>  The set to operate on.\n".
 		  "-k <key>  The key to be operated on.\n".
+		  "-K <second key>  The second key for a comment or meta\n".
+		  "-m  Add a meta.\n".
 		  "-v <value>  The value to set it to.\n".
 		  "-f <file>  The file to read and set it to.\n".
 		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
@@ -47,30 +50,30 @@ sub main::HELP_MESSAGE {
 
 #gets the options
 my %opts=();
-getopts('s:c:k:v:f:S:', \%opts);
+getopts('s:c:Ck:K:mv:f:S:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
 	warn('zcset: -c not defined');
-	exit 1;
+	exit 254;
 }
 
 #makes sure that -k is set
 if (!defined($opts{k})) {
 	warn('zcset: -k not defined');
-	exit 1;
+	exit 254;
 }
 
 #make sure both -k and -v are not defined
 if ((!defined($opts{v})) && (!defined($opts{f}))) {
 	warn('zcset: both -v and -f are not defined');
-	exit 1;
+	exit 254;
 }
 
 #make sure both -k and -v are not defined at the same time
 if ((defined($opts{v})) && (defined($opts{f}))) {
 	warn('zcset: both -v and -f are not defined');
-	exit 1;
+	exit 254;
 }
 
 #if -f is set, read it
@@ -80,10 +83,25 @@ if (defined( $opts{f} )) {
 	close(VALUE);
 }
 
+#it meta/comment make sure we have a value
+if (defined($opts{C})) {
+	if (!defined($opts{K})) {
+		warn('zcset: -K is not defined');
+		exit 254;
+	}
+}
+if (defined($opts{m})) {
+	if (!defined($opts{K})) {
+		warn('zcset: -K is not defined');
+		exit 254;
+	}
+}
+
+
 #inits zconf
 my $zconf = ZConf->new({sys=>$opts{S}});
 if($zconf->{error}){
-	exit 1;
+	exit 254;
 }
 
 #sets up the arguement hash that will be passed for reading and writing
@@ -97,19 +115,27 @@ if (defined($opts{s})) {
 #reads it
 $zconf->read(\%args);
 if(defined($zconf->{error})){
-	exit 1;
+	exit $zconf->{error};
 }
 
 #sets it
-$zconf->setVar($opts{c}, $opts{k}, $opts{v});
+if (defined( $opts{C} )) {
+	$zconf->setComment($opts{c}, $opts{k}, $opts{K}, $opts{v});
+}else {
+	if (defined( $opts{m} )) {
+		$zconf->setMeta($opts{c}, $opts{k}, $opts{K}, $opts{v});
+	}else {
+		$zconf->setVar($opts{c}, $opts{k}, $opts{v});
+	}
+}
 if (defined($zconf->{error})) {
-	exit 1;
+	exit $zconf->{error};
 }
 
 #writes it
 $zconf->writeSetFromLoadedConfig(\%args);
 if (defined($zconf->{error})) {
-	exit 1;
+	exit $zconf->{error};
 }
 
 =head1 NAME
@@ -119,13 +145,26 @@ zcset - Sets a value in a ZConf config.
 =head1 SYNOPSIS
 
 zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-v> <value>
+
 zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-f> <file>
+
+zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-K> <second key> B<-v> <value> B<-C>
+
+zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-K> <second key> B<-f> <file> B<-C>
+
+zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-K> <second key> B<-v> <value> B<-m>
+
+zcset [B<-s> <set>] B<-c> <config> B<-k> <key> B<-K> <second key> B<-f> <file> B<-m>
 
 =head1 SWTICHES
 
 =head2 -c <config>
 
 This is the configuration to operate on.
+
+=head2 -C
+
+Operate on comments.
 
 =head2 -f <file>
 
@@ -134,6 +173,14 @@ Reads the file into the variable. Either this or -v needs set.
 =head2 -k <key>
 
 This is the key to operate on.
+
+=head2 -K <second key>
+
+This is the key to operate on for comments or metas.
+
+=head2 -m
+
+Operate on metas.
 
 =head2 -s <set>
 
@@ -144,9 +191,21 @@ The choosen/default config will be used.
 
 This is the value to set it to. Either this or -f needs used.
 
+=head2 -S (0|1)
+
+Set sysmode enable/disable.
+
+=head1 EXIT CODES
+
+Any exit code listed below is a ZConf error.
+
+=head2 254
+
+Improper switch usage.
+
 =head1 AUTHOR
 
-Copyright (c) 2008, Zame C. Bowers <vvelox@vvelox.net>
+Copyright (c) 2009, Zame C. Bowers <vvelox@vvelox.net>
 
 All rights reserved.
 
@@ -171,6 +230,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =head1 Changelog
+
+=head2 2009-11-22/6:00 1.0.0
+
+Add meta and comment support.
 
 =head2 2009-11-17/4:50 0.1.1
 

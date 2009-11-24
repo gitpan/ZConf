@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#Copyright (c) 2008, Zane C. Bowers
+#Copyright (c) 2009, Zane C. Bowers
 #All rights reserved.
 #
 #Redistribution and use in source and binary forms, with or without modification,
@@ -31,40 +31,119 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 #version function
 sub main::VERSION_MESSAGE {
-	print "zcget 0.1.0\n";
+	print "zcget 1.0.0\n";
 }
 
 #print help
 sub main::HELP_MESSAGE {
 	print "\n".
 	      "-c <config>  The config to operate on.\n".
+		  "-C  Search comments.\n".
 		  "-s <set>  The set to operate on.\n".
 		  "-k <key>  The key to be operated on.\n".
-		  "-n  Don't print a newline.";
+		  "-K <secondary key>  Meta/comment key.\n".
+		  "-m  Search meta.\n".
+		  "-p  Print in ZML style.\n".
+		  "-r  The keys are regexs.\n".
+		  "-S (0|1) Enable sys mode.\n";
+}
+
+#print the vars
+sub varprint{
+	my %hash=%{$_[0]};
+	my $sechash=$_[1];
+	my $sectype=$_[2];
+	my $zmlprint=$_[3];
+
+	my @vars=keys(%hash);
+
+	@vars=sort(@vars);
+
+	my $varsInt=0;
+	while (defined( $vars[$varsInt] )) {
+		if ($sechash) {
+			#it is a meta/comment
+			my @seckeys=keys( %{ $hash{$vars[$varsInt]} } );
+
+			@seckeys=sort(@seckeys);
+
+			#process stuff in the secondary hash
+			my $seckeysInt=0;
+			while (defined( $seckeys[$seckeysInt] )) {
+				#it is a regular var
+				if ($zmlprint) {
+					print $vars[$varsInt].'='.$seckeys[$seckeysInt].'=';
+					$hash{ $vars[$varsInt] }{ $seckeys[$seckeysInt] }=~s/\n/\n /g;
+					print $hash{ $vars[$varsInt] }{ $seckeys[$seckeysInt] }."\n"
+				}else {
+					print $hash{ $vars[$varsInt] }."\n";
+				}
+				
+				$seckeysInt++;
+			}
+		}else {
+			#it is a regular var
+			if ($zmlprint) {
+				print $vars[$varsInt].'=';
+				$hash{$vars[$varsInt]}=~s/\n/\n /g;
+				print $hash{$vars[$varsInt]}."\n"
+			}else {
+				print $hash{$vars[$varsInt]}."\n";
+			}
+		}
+
+		$varsInt++;
+	}
+
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:k:nS:', \%opts);
+getopts('s:c:Ck:nS:rmK:p', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
 	warn('zcget: -c not defined');
-	exit 1;
+	exit 254;
 }
 
 #makes sure that -k is set
 if (!defined($opts{k})) {
 	warn('zcget: -k not defined');
-	exit 1;
+	exit 254;
 }
 
-#if -f is set, read it
+#handles misc stuff for comments
+if (defined($opts{C})) {
+	if (!defined($opts{K})) {
+		warn('zcget: -K not defined');
+		exit 254;
+	}
+
+	if (!defined($opts{r})) {
+		$opts{k}='^'.$opts{k}.'$';
+		$opts{K}='^'.$opts{K}.'$';
+	}
+}
+
+#handles misc stuff for metas
+if (defined($opts{m})) {
+	if (!defined($opts{K})) {
+		warn('zcget: -K not defined');
+		exit 254;
+	}
+
+	if (!defined($opts{r})) {
+		$opts{k}='^'.$opts{k}.'$';
+		$opts{K}='^'.$opts{K}.'$';
+	}
+}
+
 
 #inits zconf
 my $zconf = ZConf->new({sys=>$opts{S}});
 if($zconf->{error}){
-	exit 1;
+	exit $zconf->{error};
 }
 
 #sets up the arguement hash that will be passed for reading it
@@ -78,19 +157,47 @@ if (defined($opts{s})) {
 #reads it
 $zconf->read(\%args);
 if(defined($zconf->{error})){
-	exit 1;
+	exit $zconf->{error};
 }
 
-if (!defined($zconf->{conf}{$opts{c}}{$opts{k}})) {
-	warn('zcget: "'.$opts{k}.'" is not defined');
-	exit 1;
+#handle it if it is a comment search
+my %hash;
+my $sechash=undef;
+my $sectype='';
+if (defined($opts{C})) {
+	%hash=$zconf->regexCommentGet({
+								   config=>$opts{c},
+								   varRegex=>$opts{k},
+								   commentRegex=>$opts{K}
+								   });
+	if(defined($zconf->{error})){
+		exit $zconf->{error};
+	}
+	$sechash=1;
+	my $sectype='##';
+}else {
+	#handle it if it is a comment search
+	if (defined($opts{m})) {
+		%hash=$zconf->regexMetaGet({
+								   config=>$opts{c},
+								   varRegex=>$opts{k},
+								   metaRegex=>$opts{K}
+								   });
+		if(defined($zconf->{error})){
+			exit $zconf->{error};
+		}
+		$sechash=1;
+		my $sectype='#!';
+	}else {
+		%hash=$zconf->regexVarGet($opts{c}, $opts{k});
+		if(defined($zconf->{error})){
+			exit $zconf->{error};
+		}
+		$sechash=0;		
+	}
 }
 
-print $zconf->{conf}{$opts{c}}{$opts{k}};
-
-if (!defined($opts{n})) {
-	print "\n";
-}
+varprint(\%hash, $sechash, $sectype, $opts{p});
 
 =head1 NAME
 
@@ -98,7 +205,11 @@ zcget - Reads a value from a ZConf config.
 
 =head1 SYNOPSIS
 
-zccreate [B<-s> <set>] B<-c> <config> B<-k> <key>
+zcget [B<-S> (0|1)] [B<-s> <set>] [B<-r>] [B<-p>] B<-c> <config> B<-k> <key>
+
+zcget [B<-S> (0|1)] [B<-s> <set>] [B<-r>] [B<-p>] B<-C> B<-c> <config> B<-k> <key> B<-K> <comment key>
+
+zcget [B<-S> (0|1)] [B<-s> <set>] [B<-r>] [B<-p>] B<-m> B<-c> <config> B<-k> <key> B<-K> <meta key>
 
 =head1 SWTICHES
 
@@ -106,22 +217,52 @@ zccreate [B<-s> <set>] B<-c> <config> B<-k> <key>
 
 This is the configuration to operate on.
 
+=head2 -C
+
+Search comments.
+
 =head2 -k <key>
 
 This is the key to operate on.
 
-=head2 -n
+=head2 -K <second key>
 
-Don't print a newline.
+The meta or comment key.
+
+=head2 -m
+
+Search metas.
+
+=head2 -p
+
+Print in ZML style.
+
+=head2 -r
+
+The supplied key values are regular expression.
+
+Otherwise '^' is prefixed and '$' and is postfixed.
 
 =head2 -s <set>
 
 The set to operate on. This is the only optional switch. If it is now defined,
 The choosen/default config will be used.
 
+=head2 -S (0|1)
+
+If set to true, this will enable system mode.
+
+=head1 EXIT CODES
+
+Any error codes not specified below are ZConf error codes.
+
+=head2 254
+
+Invalid usage of some sort.
+
 =head1 AUTHOR
 
-Copyright (c) 2008, Zame C. Bowers <vvelox@vvelox.net>
+Copyright (c) 2009, Zame C. Bowers <vvelox@vvelox.net>
 
 All rights reserved.
 
@@ -146,6 +287,18 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =head1 Changelog
+
+=head2 2009-11-22/4:30 1.0.0
+
+Add meta and comment support.
+
+Add regex flag.
+
+Add key printing support.
+
+Massive documentation in provement.
+
+--help correction.
 
 =head2 2009-07-08/1:00 0.1.0
 

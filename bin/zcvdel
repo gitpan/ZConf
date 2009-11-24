@@ -38,20 +38,98 @@ sub main::VERSION_MESSAGE {
 sub main::HELP_MESSAGE {
 	print "\n".
 	      "-c <config>  The config to operate on.\n".
-		  "-s <set>  The set to operate on.\n".
+		  "-C  Operate on comments.\n".
 		  "-k <key>  The key to be operated on.\n".
+		  "-K <key>  The secondary key for comments or metas.\n".
+		  "-m  Operate on metas.\n".
 		  "-p  Print the removed ones.".
+		  "-s <set>  The set to operate on.\n".
 		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
+}
+
+#print the vars
+sub varprint{
+	my %hash=%{$_[0]};
+	my $sechash=$_[1];
+	my $sectype=$_[2];
+	my $zmlprint=$_[3];
+
+	my @vars=keys(%hash);
+
+	@vars=sort(@vars);
+
+	my $varsInt=0;
+	while (defined( $vars[$varsInt] )) {
+		if ($sechash) {
+			#it is a meta/comment
+			my @seckeys=keys( %{ $hash{$vars[$varsInt]} } );
+
+			@seckeys=sort(@seckeys);
+
+			#process stuff in the secondary hash
+			my $seckeysInt=0;
+			while (defined( $seckeys[$seckeysInt] )) {
+				#it is a regular var
+				if ($zmlprint) {
+					print $vars[$varsInt].'='.$seckeys[$seckeysInt].'=';
+					$hash{ $vars[$varsInt] }{ $seckeys[$seckeysInt] }=~s/\n/\n /g;
+					print $hash{ $vars[$varsInt] }{ $seckeys[$seckeysInt] }."\n"
+				}else {
+					print $hash{ $vars[$varsInt] }."\n";
+				}
+				
+				$seckeysInt++;
+			}
+		}else {
+			#it is a regular var
+			if ($zmlprint) {
+				print $vars[$varsInt].'=';
+				$hash{$vars[$varsInt]}=~s/\n/\n /g;
+				print $hash{$vars[$varsInt]}."\n"
+			}else {
+				print $hash{$vars[$varsInt]}."\n";
+			}
+		}
+
+		$varsInt++;
+	}
+
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:pk:S:', \%opts);
+getopts('c:Ck:K:mps:S:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
 	warn('zcvdel: -c not defined');
 	exit 1;
+}
+
+#handles misc stuff for comments
+if (defined($opts{C})) {
+	if (!defined($opts{K})) {
+		warn('zcget: -K not defined');
+		exit 254;
+	}
+
+	if (!defined($opts{r})) {
+		$opts{k}='^'.$opts{k}.'$';
+		$opts{K}='^'.$opts{K}.'$';
+	}
+}
+
+#handles misc stuff for metas
+if (defined($opts{m})) {
+	if (!defined($opts{K})) {
+		warn('zcget: -K not defined');
+		exit 254;
+	}
+
+	if (!defined($opts{r})) {
+		$opts{k}='^'.$opts{k}.'$';
+		$opts{K}='^'.$opts{K}.'$';
+	}
 }
 
 #makes sure that -k is set
@@ -88,13 +166,46 @@ if (defined($zconf->{error})) {
 	exit 1;
 }
 
+#handle it if it is a comment search
+my %hash;
+my $sechash=undef;
+my $sectype='';
+if (defined($opts{C})) {
+	%hash=$zconf->regexCommentGet({
+								   config=>$opts{c},
+								   varRegex=>$opts{k},
+								   commentRegex=>$opts{K}
+								   });
+	if(defined($zconf->{error})){
+		exit $zconf->{error};
+	}
+	$sechash=1;
+	my $sectype='##';
+}else {
+	#handle it if it is a comment search
+	if (defined($opts{m})) {
+		%hash=$zconf->regexMetaGet({
+								   config=>$opts{c},
+								   varRegex=>$opts{k},
+								   metaRegex=>$opts{K}
+								   });
+		if(defined($zconf->{error})){
+			exit $zconf->{error};
+		}
+		$sechash=1;
+		my $sectype='#!';
+	}else {
+		%hash=$zconf->regexVarGet($opts{c}, $opts{k});
+		if(defined($zconf->{error})){
+			exit $zconf->{error};
+		}
+		$sechash=0;		
+	}
+}
+
 #prints it if -p is given
 if (defined($opts{p})){
-	my $keysInt='0';
-	while (defined($keys[$keysInt])) {
-		print $keys[$keysInt]."\n";
-		$keysInt++;
-	}
+	varprint(\%hash, $sechash, $sectype, $opts{p});
 }
 
 #writes it
