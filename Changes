@@ -1,5 +1,9 @@
 Revision history for ZConf
 
+2.0.1	2009-11-26/8:00
+		-If a override chooser is not present, the override method just
+			returns 1.
+
 2.0.0	2009-11-23/20:00
 		-the writeFromHash functions now use ZML instead of creating
 			them manually. This makes it more robust as it is easier

@@ -17,11 +17,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 2.0.0
+Version 2.0.1
 
 =cut
 
-our $VERSION = '2.0.0';
+our $VERSION = '2.0.1';
 
 =head1 SYNOPSIS
 
@@ -2820,6 +2820,9 @@ set as a regular variable.
 
 One arguement is taken and it is a hash.
 
+If a value of undef is returned, but no error is set, no
+'#!zconf=override/chooser' is not defined.
+
 =head3 args hash
 
 =head4 config
@@ -2873,15 +2876,17 @@ sub override{
 
 	#if no profile is given, get one
 	if (!defined( $args{profile} )) {
-		if ( (defined( $self->{meta}{$args{config}}{zconf} ))&&(defined( $self->{meta}{$args{config}}{zconf}{'override/chooser'} )) ) {
-			my $chooser=$self->{meta}{$args{config}}{zconf}{'override/chooser'};
+		if ( (defined( $self->{meta}{$args{config}}{zconf} ))&&
+			 (defined( $self->{meta}{$args{config}}{zconf}{'override/chooser'} ))
+			) {
 
+			my $chooser=$self->{meta}{$args{config}}{zconf}{'override/chooser'};
 			#if the chooser is not blank, run it
 			if ($chooser ne '') {
 				my ($success, $choosen)=choose($chooser);
 
 				#if no choosen name is returned, use 'default'
-				if (defined($choosen)) {
+				if ($success) {
 					$args{profile}=$choosen;
 				}else {
 					$args{profile}='default';
@@ -2889,6 +2894,9 @@ sub override{
 			}else {
 				$args{profile}='default';
 			}
+		}else {
+			#none to process
+			return undef;
 		}
 	}
 
