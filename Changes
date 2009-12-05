@@ -1,5 +1,11 @@
 Revision history for ZConf
 
+3.0.0	2009-12-05/13:30
+		-Correct auto hostname choosing.
+		-Now EESDP LDAP compatible, this means it uses
+			Net::LDAP::AutoDNs and Net::LDAP::AutoServer for
+			fetching information.
+
 2.0.1	2009-11-26/8:00
 		-If a override chooser is not present, the override method just
 			returns 1.
