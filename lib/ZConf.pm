@@ -19,11 +19,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 3.0.0
+Version 3.0.1
 
 =cut
 
-our $VERSION = '3.0.0';
+our $VERSION = '3.0.1';
 
 =head1 SYNOPSIS
 
@@ -2527,7 +2527,7 @@ sub isConfigLocked{
 		}
 
 		#sync it
-		$self->lockConfigFile($config);
+		$self->setLockConfigFile($config, $returned);
 	}
 	
 	return $returned;
@@ -4628,11 +4628,13 @@ sub setLockConfigFile{
 	}
 
 	#handles unlocking it
-	if (!unlink($lockfile)) {
-		$self->{error}=44;
-		$self->{errorString}='"'.$lockfile.'" could not be unlinked.';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
-		return undef;
+	if (-e $lockfile) { #don't error if it is already unlocked
+		if (!unlink($lockfile)) {
+			$self->{error}=44;
+			$self->{errorString}='"'.$lockfile.'" could not be unlinked.';
+			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			return undef;
+		}
 	}
 
 	return 1;

@@ -1,5 +1,8 @@
 Revision history for ZConf
 
+3.0.1	2009-12-13/20:00
+		-Fix lock syncing.
+
 3.0.0	2009-12-05/13:30
 		-Correct auto hostname choosing.
 		-Now EESDP LDAP compatible, this means it uses
