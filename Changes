@@ -1,5 +1,9 @@
 Revision history for ZConf
 
+3.0.2	2009-12-13/20:20
+		-Make sure it uses the proper LDAP attribute
+			for lock checking.
+
 3.0.1	2009-12-13/20:00
 		-Fix lock syncing.
 

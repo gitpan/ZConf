@@ -19,11 +19,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 3.0.1
+Version 3.0.2
 
 =cut
 
-our $VERSION = '3.0.1';
+our $VERSION = '3.0.2';
 
 =head1 SYNOPSIS
 
@@ -1912,7 +1912,7 @@ sub getConfigRevisionLDAP{
 	}
 
 	#gets the revisions
-	my @revs=$entry->get_value('zconfRev');
+	my @revs=$entry->get_value('zconfLock');
 	if (!defined($revs[0])) {
 		return undef;
 	}
@@ -2643,7 +2643,7 @@ sub isConfigLockedLDAP{
 	}
 
 	#check if it is locked or not
-	my @locks=$entry->get_value('zconfRev');
+	my @locks=$entry->get_value('zconfLock');
 	if (defined($locks[0])) {
 		#it is locked
 		return 1;
