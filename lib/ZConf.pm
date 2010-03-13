@@ -19,11 +19,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 3.0.2
+Version 3.1.0
 
 =cut
 
-our $VERSION = '3.0.2';
+our $VERSION = '3.1.0';
 
 =head1 SYNOPSIS
 
@@ -1236,13 +1236,13 @@ sub delConfigLDAP{
 
 	#remove it
 	$entry->delete();
-	$entry->update($ldap);
+	my $results=$entry->update($ldap);
 
 	#return if it could not be removed
-	if($ldap->error()){
+	if($results->is_error()){
 		$self->{error}='34';
 		$self->{errorString}=' Could not delete the LDAP entry, "'.
-							$entry->dn().'". LDAP return an error of "'.$ldap->error.
+							$entry->dn().'". LDAP return an error of "'.$results->is_error.
 							'" and an error code of "'.$ldap->errcode.'"';
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
@@ -1489,6 +1489,23 @@ sub delSetLDAP{
 	return 1;
 }
 
+=head2 error
+
+Returns the current error code and true if there is an error.
+
+If there is no error, undef is returned.
+
+    my $error=$foo->error;
+    if($error){
+        print 'error code: '.$error."\n";
+    }
+
+=cut
+
+sub error{
+    return $_[0]->{error};
+}
+
 =head2 errorBlank
 
 This blanks the error storage and is only meant for internal usage.
@@ -1509,6 +1526,22 @@ sub errorBlank{
 	
 	return 1;
 };
+
+=head2 errorString
+
+Returns the error string if there is one. If there is not,
+it will return ''.
+
+    my $error=$foo->error;
+    if($error){
+        print 'error code:'.$error.': '.$foo->errorString."\n";
+    }
+
+=cut
+
+sub errorString{
+    return $_[0]->{errorString};
+}
 
 =head2 getAutoupdate
 
@@ -6083,7 +6116,7 @@ sub writeSetFromHashLDAP{
 
 	#gets the setstring
 	my $setstring=$args{set}."\n".$zml->string;
-		
+
 	#creates the DN from the config
 	my $dn=$self->config2dn($args{config}).",".$self->{args}{"ldap/base"};
 
@@ -6172,11 +6205,20 @@ sub writeSetFromHashLDAP{
 	if (!defined($args{revision})) {
 		$args{revision}=time.' '.hostname.' '.rand();
 	}
-	$entry->delete('zconfRev');
+	@attributes=$entry->get_value('zconfRev');
+	if (defined($attributes[0])) {
+		$entry->delete('zconfRev');		
+	}
 	$entry->add(zconfRev=>[$args{revision}]);
 
 	#write the entry to LDAP
 	my $results=$entry->update($ldap);
+	if ($results->is_error) {
+		$self->{error}=46;
+		$self->{errorString}="Entry update failed. error='".$results->error."'";
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
 
 	#save the revision info
 	$self->{revision}{$args{config}}=$args{revision};
@@ -6936,6 +6978,10 @@ Failed to open or unlink lock file.
 =head2 45
 
 Config is locked.
+
+=head2 46
+
+LDAP entry update failed.
 
 =head1 ERROR CHECKING
 

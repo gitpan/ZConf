@@ -1,5 +1,10 @@
 Revision history for ZConf
 
+3.1.0	2010-03-12/06:10
+		-Add the methods 'error' and 'errorString'.
+		-Fix writing newly initiated configs in LDAP so it no longer complains
+			about 'zconfRev' not being present in the entry.
+
 3.0.2	2009-12-13/20:20
 		-Make sure it uses the proper LDAP attribute
 			for lock checking.
