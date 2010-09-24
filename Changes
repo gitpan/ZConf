@@ -1,5 +1,8 @@
 Revision history for ZConf
 
+4.0.1	2010-10-24/07:45
+		-Correct getAvailableSets if it does not error.
+
 4.0.0	2010-09-24/06:50
 		-Break the backends out into seperate modules.
 		-Lots of documentation cleanup.

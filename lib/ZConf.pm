@@ -15,11 +15,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 4.0.0
+Version 4.0.1
 
 =cut
 
-our $VERSION = '4.0.0';
+our $VERSION = '4.0.1';
 
 =head1 SYNOPSIS
 
@@ -834,7 +834,7 @@ sub getAvailableSets{
 			$self->{errorString}='Backend errored. error="'.$self->{fbe}->error.'" errorString="'.$self->{fbe}->errorString.'"';
 			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		}
-	}else {
+	}elsif ( $self->{be}->error ) {
 		$self->{error}=11;
 		$self->{errorString}='Backend errored. error="'.$self->{be}->error.'" errorString="'.$self->{be}->errorString.'"';
 		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});		
