@@ -1,5 +1,12 @@
 Revision history for ZConf
 
+4.0.0	2010-09-24/06:50
+		-Break the backends out into seperate modules.
+		-Lots of documentation cleanup.
+
+3.1.1	2010-05-29/
+		-Clean up the documentation on the regex get functions.
+
 3.1.0	2010-03-12/06:10
 		-Add the methods 'error' and 'errorString'.
 		-Fix writing newly initiated configs in LDAP so it no longer complains

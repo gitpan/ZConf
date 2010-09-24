@@ -1,1 +1,3 @@
--syncing between backends
+-dumping
+-restoring from dumps
+-ZML importing/exporting
