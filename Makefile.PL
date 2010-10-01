@@ -21,6 +21,7 @@ WriteMakefile(
 							'Sys::Hostname' => 0,
 							'Net::LDAP::AutoServer' => 0,
 							'Net::LDAP::AutoDNs' => 0,
+							'Module::List' => 0,
 							},
 			  dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 			  clean               => { FILES => 'ZConf-*' },

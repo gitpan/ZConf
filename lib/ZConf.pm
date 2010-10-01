@@ -15,11 +15,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 4.0.1
+Version 4.1.0
 
 =cut
 
-our $VERSION = '4.0.1';
+our $VERSION = '4.1.0';
 
 =head1 SYNOPSIS
 
@@ -56,7 +56,7 @@ This is incompatible with the file option.
 
     my $zconf=ZConf->new();
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->{error}."\n".$zconf->errorString);
     }
 
 =cut
@@ -320,7 +320,7 @@ returned.
 
 	my $set=$zconf->chooseSet("foo/bar");
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->{error}."\n".$zconf->errorString);
     }
 
 =cut
@@ -424,7 +424,7 @@ CONFIG NAME for more info on config naming.
 
 	my ($error, $errorString) = $zconf->configNameCheck($config);
 	if(defined($error)){
-		warn("zconf configExists:".$error.": ".$errorString);
+		warn("ZConf configExists:".$error.": ".$errorString);
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
 		return undef;
@@ -556,7 +556,7 @@ which is the name of the config. The returned value is a Perl boolean.
 
     my $returned=$zconf->defaultSetExists('someConfig');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->{error}."\n".$zconf->errorString);
     }
     if($returned){
         print "It exists.\n";
@@ -621,7 +621,7 @@ present, this function will error.
     #removes 'foo/bar'
     $zconf->delConfig('foo/bar');
     if(defined($zconf->error)){
-        print 'error!';
+		warn('error: '.$zconf->{error}."\n".$zconf->errorString);
     }
 
 =cut
@@ -687,7 +687,7 @@ the second is the name of the set.
 
     $zconf->delSetFile("foo/bar", "someset");
     if($zconf->error){
-        print "delSet failed\n";
+		warn('error: '.$zconf->{error}."\n".$zconf->errorString);
     }
 
 =cut
@@ -750,6 +750,106 @@ sub delSet{
 	return $returned;
 }
 
+=head2 dumpToZML
+
+This dumps a loaded config to a ZML object.
+
+One arguement is required and it is the name of the loaded config.
+
+    my $zml=$foo->dumpToZML($config);
+	if($zconf->error){
+		warn('error: '.$zconf->{error}."\n".$zconf->errorString);
+	}
+
+=cut
+
+sub dumpToZML{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $method='dumpToZML';
+
+	$self->errorBlank;
+
+	#return if no config is given
+	if (!defined($config)){
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$config."' is not loaded.";
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#create the ZML object
+	my $zml=ZML->new();
+
+	#process variables
+	my $varhashkeysInt=0;#used for intering through the list of hash keys
+	#builds the ZML object
+	my @varhashkeys=keys(%{$self->{conf}{$config}});
+	while(defined($varhashkeys[$varhashkeysInt])){
+		#attempts to add the variable
+		$zml->addVar($varhashkeys[$varhashkeysInt], 
+					$self->{conf}{$config}{$varhashkeys[$varhashkeysInt]});
+		#checks to verify there was no error
+		#this is not a fatal error... skips it if it is not legit
+		if(defined($zml->{error})){
+			warn($self->{module}.' '.$method.':23: $zml->add() returned '.
+				$zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
+				$varhashkeys[$varhashkeysInt]."' in '".$config."'.");
+		}
+
+		$varhashkeysInt++;
+	}
+
+	#processes the meta variables
+	$varhashkeysInt=0;#used for intering through the list of hash keys
+	#builds the ZML object
+	@varhashkeys=keys(%{$self->{meta}{$config}});
+	while(defined($varhashkeys[$varhashkeysInt])){
+		my @metahashkeys=keys( %{$self->{meta}{ $config }{ $varhashkeys[$varhashkeysInt] }} );
+		my $metahashkeysInt=0;
+		while (defined($metahashkeys[ $metahashkeysInt ])) {
+			$zml->addMeta(
+						  $varhashkeys[$varhashkeysInt],
+						  $metahashkeys[$metahashkeysInt],
+						  $self->{meta}{ $config }{ $varhashkeys[$varhashkeysInt] }{ $metahashkeys[$metahashkeysInt] }
+						  );
+			
+			$metahashkeysInt++;
+		}
+
+		$varhashkeysInt++;
+	}
+
+	#processes the comment variables
+	$varhashkeysInt=0;#used for intering through the list of hash keys
+	#builds the ZML object
+	@varhashkeys=keys(%{ $self->{comment}{$config} });
+	while(defined($varhashkeys[$varhashkeysInt])){
+		my @commenthashkeys=keys( %{$self->{self}->{comment}{ $config }{ $varhashkeys[$varhashkeysInt] }} );
+		my $commenthashkeysInt=0;
+		while (defined($commenthashkeys[ $commenthashkeysInt ])) {
+			$zml->addComment(
+						  $varhashkeys[$varhashkeysInt],
+						  $commenthashkeys[$commenthashkeysInt],
+						  $self->{comment}{ $config }{ $varhashkeys[$varhashkeysInt] }{ $commenthashkeys[$commenthashkeysInt] }
+						  );
+			
+			$commenthashkeysInt++;
+		}
+
+		$varhashkeysInt++;
+	}
+
+	return $zml;
+}
+
 =head2 getAutoupdate
 
 This gets if a config should be automatically updated or not.
@@ -792,7 +892,7 @@ The only arguement is the name of the configuration in question.
 
 	my @sets = $zconf->getAvailableSets("foo/bar");
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -866,7 +966,7 @@ This gets a list of variables that have comments.
 
 	my @keys = $zconf->getComments("foo/bar")
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
 	}
 
 =cut
@@ -899,7 +999,7 @@ This fetches the revision for the speified config.
 
     my $revision=$zconf->getConfigRevision('some/config');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -962,7 +1062,7 @@ changed since ZConf 2.0.0 came out.
 
     my $time=$zconf->getMtime('some/config', 'some/var');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
     if(defined($time)){
         print "variable modified at".$time." seconds past 1970-01-01.\n";
@@ -991,8 +1091,9 @@ sub getCtime{
 		return undef;			
 	}
 
-	if(!defined($self->{conf}{$config})){
-		$self->{error}=25;
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
@@ -1016,7 +1117,7 @@ This gets gets the keys for a loaded config.
 
 	my @keys = $zconf->getKeys("foo/bar")
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1031,7 +1132,8 @@ sub getKeys {
 	#update if if needed
 	$self->updateIfNeeded({config=>$config, clearerror=>1, autocheck=>1 });
 
-	if(!defined($self->{conf}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -1050,7 +1152,7 @@ if it is loaded.
 
     my $rev=$zconf->getLoadedConfigRevision;
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1071,7 +1173,7 @@ sub getLoadedConfigRevision{
 	}
 
 	#make sure it is loaded
-	if(!defined($self->{conf}{$config})){
+	if(! $self->isConfigLoaded($config) ){
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -1087,7 +1189,7 @@ This gets gets the keys for a loaded config.
 
 	my @configs = $zconf->getLoadedConfigs("foo/bar")
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1110,7 +1212,7 @@ variables.
 
 	my @keys = $zconf->getComments("foo/bar")
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1125,7 +1227,7 @@ sub getMetas {
 	#update if if needed
 	$self->updateIfNeeded({config=>$config, clearerror=>1, autocheck=>1 });
 
-	if(!defined($self->{meta}{$config})){
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -1150,7 +1252,7 @@ changed since ZConf 2.0.0 came out.
 
     my $time=$zconf->getMtime('some/config', 'some/var');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
     if(defined($time)){
         print "variable modified at".$time." seconds past 1970-01-01.\n";
@@ -1179,8 +1281,9 @@ sub getMtime{
 		return undef;			
 	}
 
-	if(!defined($self->{conf}{$config})){
-		$self->{error}=25;
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
@@ -1210,7 +1313,7 @@ This method is basically a wrapper around regexMetaGet.
 
     my $orchooser=$zconf->getOverrideChooser($config);
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1231,10 +1334,10 @@ sub getOverrideChooser{
 		return undef;			
 	}
 
-	#make sure the loaded config is not locked
-	if (defined( $self->{locked}{ $config } )) {
-		$self->{error}=45;
-		$self->{errorString}='The config "'.$config.'" is locked';
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
@@ -1254,7 +1357,7 @@ This gets the set for a loaded config.
 
 	my $set = $zconf->getSet("foo/bar")
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1286,7 +1389,7 @@ One arguement is accepted and that is the config to look under.
     #lets assume 'foo/bar' exists, this would return
     my @subConfigs=$zconf->getSubConfigs("foo");
     if($zconf->error){
-        print "There was some error.\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1339,7 +1442,7 @@ Only one arguement is taken and that is the name of the config.
 
     my $returned=$zconf->isLoadedConfigLocked('some/config');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1360,7 +1463,7 @@ sub isLoadedConfigLocked{
 	}
 
 	#make sure it is loaded
-	if(!defined($self->{conf}{$config})){
+	if(! $self->isConfigLoaded( $config ) ){
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -1368,6 +1471,40 @@ sub isLoadedConfigLocked{
 	}
 
 	if (defined($self->{locked}{$config})) {
+		return 1;
+	}
+
+	return undef;
+}
+
+=head2 isConfigLoaded
+
+This checks if a config or not.
+
+One argument is taken and that is if a config is loaded or not.
+
+    $zconf->isConfigLoaded($config);
+    if( $zconf->error ){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
+    }
+
+=cut
+
+sub isConfigLoaded{
+	my $self=$_[0];
+	my $config=$_[1];
+	my $method='isConfigLoaded';
+
+	$self->errorBlank;
+
+	if (!defined($config)) {
+		$self->{error}=25;
+		$self->{errorString}="Config is undefined";
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	if ( defined( $self->{conf}{ $config } ) ) {
 		return 1;
 	}
 
@@ -1384,7 +1521,7 @@ The returned value is a boolean value.
 
     my $locked=$zconf->isConfigLocked('some/config');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
     if($locked){
         print "The config is locked\n";
@@ -1448,7 +1585,7 @@ This generates a Net::LDAP object based on the LDAP backend.
 
     my $ldap=$zconf->LDAPconnect();
     if($zconf->error){
-        print "error!";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1644,7 +1781,7 @@ The set for that config to load.
 
     $zconf->read({config=>"foo/bar"})
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1733,7 +1870,7 @@ The name of the config is the only required arguement.
 
 	my $chooser = $zconf->readChooser("foo/bar")
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1832,7 +1969,7 @@ The regex use for matching comment names.
                                          commentRegex=>"^monkey\/";
                                         });
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1858,6 +1995,15 @@ sub regexCommentDel{
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($args{config}) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$args{config}."' is not loaded.";
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
 
 	#return false if the config is not set
 	if (!defined($args{varRegex})){
@@ -1938,7 +2084,7 @@ The regex use for matching comment names.
                                          commentRegex=>"^monkey\/";
                                         });
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1963,6 +2109,14 @@ sub regexCommentGet{
 		$self->{errorString}='$config not defined';
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
+	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($args{config}) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$args{config}."' is not loaded.";
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
 	}
 
 	#return false if the config is not set
@@ -2035,7 +2189,7 @@ The regex use for matching meta variables.
                                       metaRegex=>"^monkey\/";
                                      });
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2060,6 +2214,14 @@ sub regexMetaDel{
 		$self->{errorString}='$config not defined';
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
+	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($args{config}) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$args{config}."' is not loaded.";
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
 	}
 
 	#return false if the config is not set
@@ -2141,7 +2303,7 @@ The regex use for matching meta variables.
                                       metaRegex=>"^monkey\/";
                                      });
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2166,6 +2328,14 @@ sub regexMetaGet{
 		$self->{errorString}='$config not defined';
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
+	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($args{config}) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$args{config}."' is not loaded.";
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
 	}
 
 	#return false if the config is not set
@@ -2220,7 +2390,7 @@ is the regular expression to use.
 	#removes any variable starting with the monkey
 	my @deleted = $zconf->regexVarDel("foo/bar", "^monkey");
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2243,7 +2413,8 @@ sub regexVarDel{
 		return undef;			
 	}
 
-	if(!defined($self->{conf}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -2286,7 +2457,7 @@ is the regular expression to use.
 	#returns any variable begining with monkey
 	my %vars = $zconf->regexVarGet("foo/bar", "^monkey");
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2310,8 +2481,9 @@ sub regexVarGet{
 		return undef;			
 	}
 
-	if(!defined($self->{conf}{$config})){
-		$self->{error}=25;
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
@@ -2344,7 +2516,7 @@ is the regular expression to use.
 	#removes any variable starting with the monkey
 	my @matched = $zconf->regexVarSearch("foo/bar", "^monkey")
 	if($zconf->error)){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2367,9 +2539,10 @@ sub regexVarSearch{
 		return undef;			
 	}
 
-	if(!defined($self->{conf}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
-		$self->{errorString}="Config '".$config."' is not loaded";
+		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
@@ -2397,7 +2570,7 @@ loaded.
 
     $zconf->reread('some/config');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -2417,9 +2590,10 @@ sub reread{
 		return undef;			
 	}
 
-	if(!defined($self->{set}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
-		$self->{errorString}="Set '".$config."' is not loaded.";
+		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
@@ -2484,7 +2658,7 @@ variable. The fourth is the value.
 
 	$zconf->setComment("foo/bar" , "somethingVar", "someComment", "eat more weazel\n\nor something"
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 
@@ -2552,7 +2726,8 @@ sub setComment{
 		return undef;
 	}
 
-	if(!defined($self->{comment}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -2574,7 +2749,7 @@ This sets the default set to use if one is not specified or choosen.
 
 	my $returned = $zconf->setDefault("something")
 	if($zconf->error){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2609,7 +2784,7 @@ set is used. This is done by calling 'defaultSetExists'.
 
     my $return=$zconf->setExists("foo/bar", "fubar");
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }else{
         if($return){
             print "It exists.\n";
@@ -2669,19 +2844,19 @@ if it should be locked or unlocked
     #lock 'some/config'
     $zconf->setLockConfig('some/config', 1);
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
     #unlock 'some/config'
     $zconf->setLockConfig('some/config', 0);
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
     #unlock 'some/config'
     $zconf->setLockConfig('some/config');
     if($zconf->error){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -2745,8 +2920,8 @@ variable. The fourth is the value.
 
 	$zconf->setMeta("foo/bar" , "somethingVar", "someComment", "eat more weazel\n\nor something"
 	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
-	};
+		warn('error: '.$zconf->error.":".$zconf->errorString);
+	}
 
 
 =cut
@@ -2804,7 +2979,8 @@ sub setMeta{
 		return undef;
 	}
 
-	if(!defined($self->{meta}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -2831,7 +3007,7 @@ The returned value is a perl boolean value.
 
 	my $set="something";
 	if(!$zconf->setNameLegit($set)){
-		print "'".$set."' is not a legit set name.\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2876,7 +3052,7 @@ sub setNameLegit{
 
 =head2 setOverrideChooser
 
-This will get the current override chooser for a config.
+This will set the override chooser for a config.
 
 If no chooser is specified for the loaded config
 
@@ -2886,8 +3062,8 @@ and th e second is the chooser string.
 This method is basically a wrapper around setMeta.
 
     $zconf->setOverrideChooser($config, $chooser);
-    if($zconf->{error}){
-        print "Error!\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -2925,6 +3101,14 @@ sub setOverrideChooser{
 		return undef;			
 	}
 
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$config."' is not loaded.";
+		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
 	#make sure the loaded config is not locked
 	if (defined( $self->{locked}{ $config } )) {
 		$self->{error}=45;
@@ -2950,8 +3134,8 @@ Three arguements are required. The first is the name of the config.
 The second is the name of the variable. The third is the value.
 
 	$zconf->setVar("foo/bar" , "something", "eat more weazel\n\nor something"
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 
@@ -2993,7 +3177,8 @@ sub setVar{
 		return undef;
 	}
 
-	if(!defined($self->{conf}{$config})){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -3029,8 +3214,9 @@ sub setVar{
 Unloads a specified configuration. The only required value is the
 set name. The return value is a Perl boolean value.
 
-    if(!$zconf->unloadConfig($config)){
-        print "error: ".$zconf->{error}."\n";
+    zconf->unloadConfig($config);
+    if( $zconf->error )
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -3100,8 +3286,8 @@ The return value is a boolean value. A value of true indicates the config has
 been changed on the backend.
 
     my $updatable=$zconf->updatable('some/config');
-    if($zconf->{error}){
-        print "Error!";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -3121,8 +3307,8 @@ sub updatable{
 		return undef;
 	}
 
-	#make sure it is loaded
-	if(!defined($self->{conf}{$config})){
+	#makes sure it is loaded
+	if (! $self->isConfigLoaded($config) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$config."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
@@ -3182,7 +3368,7 @@ This is required.
 
     my $updated=$zconf->updateIfNeeded({config=>'some/config'});
     if($zconf->{error}){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
     if($updated){
         print "Updated!\n";
@@ -3208,13 +3394,13 @@ sub updateIfNeeded{
 		return undef;
 	}
 
-	#make sure it is loaded
-	if(!defined($self->{conf}{ $args{config} })){
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded( $args{config}) ) {
 		$self->{error}=26;
 		$self->{errorString}="Config '".$args{config}."' is not loaded.";
 		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
-	}	
+	}
 
 	#checks the value for autoupdate
 	if ($args{autocheck}) {
@@ -3257,7 +3443,7 @@ This checks if a there if the specified variable name is a legit one or not.
 
 	my ($error, $errorString) = $zconf->varNameCheck($config);
 	if(defined($error)){
-        print $error.': '.$errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -3339,7 +3525,7 @@ and the default will be used when chooseSet is called.
 
 	my $returned = $zconf->writeChooser("foo/bar", $chooserString)
 	if($zconf->error){
-		print 'error: '.$zconf->error."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -3449,8 +3635,8 @@ that you don't touch this unless you really know what you
 are doing.
 
     $zconf->writeSetFromHash({config=>"foo/bar"}, \%hash)
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -3557,7 +3743,7 @@ are doing.
 
     $zconf->writeSetFromLoadedConfig({config=>"foo/bar"});
 	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -3578,7 +3764,7 @@ sub writeSetFromLoadedConfig{
 		return undef;			
 	}
 
-	if(!defined($self->{conf}{$args{config}})){
+	if(! $self->isConfigLoaded( $args{config} ) ){
 		$self->{error}=25;
 		$self->{errorString}="Config '".$args{config}."' is not loaded";
 		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
@@ -3640,9 +3826,8 @@ Returns the current error code and true if there is an error.
 
 If there is no error, undef is returned.
 
-    my $error=$foo->error;
-    if($error){
-        print 'error code: '.$error."\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -3677,9 +3862,8 @@ sub errorBlank{
 Returns the error string if there is one. If there is not,
 it will return ''.
 
-    my $error=$foo->error;
-    if($error){
-        print 'error code:'.$error.': '.$foo->errorString."\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut

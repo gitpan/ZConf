@@ -1,5 +1,16 @@
 Revision history for ZConf
 
+4.1.0	2010-10-30/22:00
+		-CPAN should now show the POD for ZConf::backends::files.
+		-Add the method 'dumpToZML' and 'isConfigLoaded' to 'ZConf'.
+		-'writeSetFromLoadedConfig' now verifies if the config is loaded.
+		-Add 'bin/zccdump'.
+		-Add 'Module::List' as a dependency to 'Makefile.PL' as it was missing.
+		-Update 'MANIFEST', fixing lots of missing stuff.
+		-Add some nicer example stuff to the POD.
+		-The 'writeSetFromLoadedConfig' for the backends now checks if a config is loaded and for the config name.
+		-Rename anything improperly labeled function is labeled method.
+
 4.0.1	2010-10-24/07:45
 		-Correct getAvailableSets if it does not error.
 

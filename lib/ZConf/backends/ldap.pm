@@ -17,11 +17,11 @@ ZConf::backends::ldap - This provides LDAP backend for ZConf.
 
 =head1 VERSION
 
-Version 0.0.0
+Version 0.0.1
 
 =cut
 
-our $VERSION = '0.0.0';
+our $VERSION = '0.0.1';
 
 =head1 METHODS
 
@@ -52,7 +52,7 @@ This is the variables found in the ~/.config/zconf.zml.
 
     my $backend=ZConf::backends::ldap->new( \%args );
     if((!defined($zconf)) || ($zconf->{error})){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -63,7 +63,7 @@ sub new {
 	if(defined($_[1])){
 		%args= %{$_[1]};
 	};
-	my $function='new';
+	my $method='new';
 
 	#The thing that will be returned.
 	#conf holds configs
@@ -89,26 +89,26 @@ sub new {
 	if (!defined( $args{self} )) {
 		$self->{error}=47;
 		$self->{errorString}='No ZConf object passed';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return $self;
 	}
 	if ( ref($args{self}) ne 'ZConf' ) {
 		$self->{error}=47;
 		$self->{errorString}='No ZConf object passed. ref returned "'.ref( $args{self} ).'"';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return $self;
 	}
 	$self->{self}=$args{self};
 	if (!defined( $args{zconf} )) {
 		$self->{error}=48;
 		$self->{errorString}='No zconf.zml var hash passed';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return $self;		
 	}
 	if ( ref($args{zconf}) ne 'HASH' ) {
 		$self->{error}=48;
 		$self->{errorString}='No zconf.zml var hash passed. ref returned "'.ref( $args{zconf} ).'"';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return $self;
 	}
 	$self->{zconf}=$args{zconf};
@@ -158,7 +158,7 @@ sub new {
 	if($zml->{error}){
 		$self->{error}=28;
 		$self->{errorString}="ZML\-\>parse error, '".$zml->{error}."', '".$zml->{errorString}."'";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return $self;
 	}
 	$self->{zconf}=$zml->{var};
@@ -390,7 +390,7 @@ sub new {
 				$self->{args}{"ldap/password"}=join( "\n", <PASSWORDFILE> );
 				close(PASSWORDFILE);
 			}else {
-				warn($self->{module}.' '.$function.': Failed to open the password file, "'.
+				warn($self->{module}.' '.$method.': Failed to open the password file, "'.
 					 $self->{args}{"ldap/passwordfile"}.'",');
 			}
 		}
@@ -482,12 +482,12 @@ sub new {
 
 =head2 config2dn
 
-This function converts the config name into part of a DN string. IT
+This method converts the config name into part of a DN string. IT
 is largely only for internal use and is used by the LDAP backend.
 
 	my $partialDN = $zconf->config2dn("foo/bar");
-    if($zconf->{error}){
-        print "Error!\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -496,7 +496,7 @@ is largely only for internal use and is used by the LDAP backend.
 sub config2dn(){
 	my $self=$_[0];
 	my $config=$_[1];
-	my $function='config2dn';
+	my $method='config2dn';
 
 	$self->errorBlank;
 
@@ -508,7 +508,7 @@ sub config2dn(){
 	if(defined($error)){
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -534,15 +534,15 @@ sub config2dn(){
 
 =head2 configExists
 
-This function functions exactly the same as configExists, but
+This method methods exactly the same as configExists, but
 for the LDAP backend.
 
 No config name checking is done to verify if it is a legit name or not
 as that is done in configExists. The same is true for calling errorBlank.
 
     $zconf->configExistsLDAP("foo/bar")
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -550,7 +550,7 @@ as that is done in configExists. The same is true for calling errorBlank.
 #check if a LDAP config exists
 sub configExists{
 	my ($self, $config) = @_;
-	my $function='configExists';
+	my $method='configExists';
 
 	$self->errorBlank;
 
@@ -578,13 +578,13 @@ sub configExists{
 
 =head2 createConfig
 
-This functions just like createConfig, but is for the LDAP backend.
+This methods just like createConfig, but is for the LDAP backend.
 This is not really meant for external use. The config name passed
 is not checked to see if it is legit or not.
 
     $zconf->createConfigLDAP("foo/bar")
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	};
 
 =cut
@@ -592,7 +592,7 @@ is not checked to see if it is legit or not.
 #creates a new LDAP enty if it is not defined
 sub createConfig{
 	my ($self, $config) = @_;
-	my $function='createConfig';
+	my $method='createConfig';
 
 	$self->errorBlank;
 
@@ -625,13 +625,13 @@ sub createConfig{
 		if(!$returned){
 			$self->{errorString}="zconf createLDAPConfig:22: Adding '".$dn."' failed when executing LDAPmakepathSimple.\n";
 			$self->{error}=22;
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;
 		}
 	}else{
 		$self->{error}=11;
 		$self->{errorString}=" DN '".$dn."' already exists.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 
 	}
@@ -641,12 +641,12 @@ sub createConfig{
 =head2 delConfig
 
 This removes a config. Any sub configs will need to removes first. If any are
-present, this function will error.
+present, this method will error.
 
     #removes 'foo/bar'
     $zconf->delConfig('foo/bar');
-    if($zconf->{error}){
-        print 'error!';
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -654,7 +654,7 @@ present, this function will error.
 sub delConfig{
 	my $self=$_[0];
 	my $config=$_[1];
-	my $function='delConfig';
+	my $method='delConfig';
 
 	$self->errorBlank;
 
@@ -663,7 +663,7 @@ sub delConfig{
 	if (defined($subs[0])) {
 		$self->{error}='33';
 		$self->{errorString}='Could not remove the config as it has sub configs';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -673,7 +673,7 @@ sub delConfig{
 	if (defined($self->{error})){
 		$self->{error}='12';
 		$self->{errorString}='The config, "'.$config.'", does not exist';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -687,7 +687,7 @@ sub delConfig{
 	if (!defined($entry)){
 		$self->{error}='13';
 		$self->{errorString}='The expected DN was not found';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -701,7 +701,7 @@ sub delConfig{
 		$self->{errorString}=' Could not delete the LDAP entry, "'.
 							$entry->dn().'". LDAP return an error of "'.$results->is_error.
 							'" and an error code of "'.$ldap->errcode.'"';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -716,8 +716,8 @@ Two arguements are required. The first one is the name of the config and the and
 the second is the name of the set.
 
     $zconf->delSet("foo/bar", "someset");
-    if($zconf->{error}){
-        print "delSet failed\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 
@@ -727,7 +727,7 @@ sub delSet{
 	my $self=$_[0];
 	my $config=$_[1];
 	my $set=$_[2];
-	my $function='delSet';
+	my $method='delSet';
 
 	$self->errorBlank;
 
@@ -735,7 +735,7 @@ sub delSet{
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -759,13 +759,13 @@ sub delSet{
 	if(!defined($entry->dn())){
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}else{
 		if($entry->dn ne $dn){
 			$self->{error}=13;
 			$self->{errorString}="Expected DN, '".$dn."' not found.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;				
 		};
 	};
@@ -804,13 +804,13 @@ sub delSet{
 		if(!$setFound){
 			$self->{error}=31;
 			$self->{errorString}='The specified set, "'.$set.'" was not found for "'.$config.'".';
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;
 		}
 	}else{
 		$self->{error}=30;
 		$self->{errorString}='No zconfData attributes exist for "'.$dn.'" and thus no sets exist.';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -826,15 +826,15 @@ This is exactly the same as getAvailableSets, but for the file back end.
 For the most part it is not intended to be called directly.
 
 	my @sets = $zconf->getAvailableSetsLDAP("foo/bar");
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
 
 sub getAvailableSets{
 	my ($self, $config) = @_;
-	my $function='getAvailableSets';
+	my $method='getAvailableSets';
 
 	$self->errorBlank;
 
@@ -852,7 +852,7 @@ sub getAvailableSets{
 	if(!defined($hashedmesg{$dn})){
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 		
@@ -875,8 +875,8 @@ A return of undef means that the config has no sets created for it
 yet or it has not been read yet by 2.0.0 or newer.
 
     my $revision=$zconf->getConfigRevision('some/config');
-    if($zconf->{error}){
-        print "Error!\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
     if(!defined($revision)){
         print "This config has had no sets added since being created or is from a old version of ZConf.\n";
@@ -887,7 +887,7 @@ yet or it has not been read yet by 2.0.0 or newer.
 sub getConfigRevision{
 	my $self=$_[0];
 	my $config=$_[1];
-	my $function='getConfigRevision';
+	my $method='getConfigRevision';
 
 	$self->errorBlank;
 
@@ -895,7 +895,7 @@ sub getConfigRevision{
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='No config specified';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -903,7 +903,7 @@ sub getConfigRevision{
 	if(!$self->configExists($config)){
 		$self->{error}=12;
 		$self->{errorString}="'".$config."' does not exist.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -911,7 +911,7 @@ sub getConfigRevision{
 	my $entry=$self->LDAPgetConfEntry($config);
 	#return upon error
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': LDAPgetConfEntry errored');
+		warn($self->{module}.' '.$method.': LDAPgetConfEntry errored');
 		return undef;
 	}
 
@@ -933,8 +933,8 @@ One arguement is accepted and that is the config to look under.
 
     #lets assume 'foo/bar' exists, this would return
     my @subConfigs=$zconf->getSubConfigs("foo");
-    if($zconf->{error}){
-        print "There was some error.\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -942,7 +942,7 @@ One arguement is accepted and that is the config to look under.
 #gets the configs under a config
 sub getSubConfigs{
 	my ($self, $config)= @_;
-	my $function='getSubConfigs';
+	my $method='getSubConfigs';
 
 	$self->errorBlank;
 
@@ -997,8 +997,8 @@ One arguement is required and it is the name of the config.
 The returned value is a boolean value.
 
     my $locked=$zconf->isConfigLockedLDAP('some/config');
-    if($zconf->{error}){
-        print "Error!\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
     if($locked){
         print "The config is locked\n";
@@ -1009,7 +1009,7 @@ The returned value is a boolean value.
 sub isConfigLocked{
 	my $self=$_[0];
 	my $config=$_[1];
-	my $function='isConfigLocked';
+	my $method='isConfigLocked';
 
 	$self->errorBlank;
 
@@ -1017,27 +1017,27 @@ sub isConfigLocked{
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='No config specified';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
 	#makes sure it exists
 	my $exists=$self->configExists($config);
     if ($self->{error}) {
-		warn($self->{module}.' '.$function.': configExists errored');
+		warn($self->{module}.' '.$method.': configExists errored');
 		return undef;
 	}
 	if (!$exists) {
 		$self->{error}=12;
 		$self->{errorString}='The config, "'.$config.'", does not exist';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
 	my $entry=$self->LDAPgetConfEntry($config);
 	#return upon error
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': LDAPgetConfEntry errored');
+		warn($self->{module}.' '.$method.': LDAPgetConfEntry errored');
 		return undef;
 	}
 
@@ -1057,15 +1057,15 @@ sub isConfigLocked{
 This generates a Net::LDAP object based on the LDAP backend.
 
     my $ldap=$zconf->LDAPconnect();
-    if($zconf->{error}){
-        print "error!";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
 
 sub LDAPconnect{
 	my $self=$_[0];
-	my $function='LDAPconnect';
+	my $method='LDAPconnect';
 
 	$self->errorBlank;
 
@@ -1079,7 +1079,7 @@ sub LDAPconnect{
 	if (!$ldap) {
 		$self->{error}=1;
 		$self->{errorString}='Failed to connect to LDAP';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1101,7 +1101,7 @@ sub LDAPconnect{
 			$self->{error}=1;
 			$self->{errorString}='$ldap->start_tls failed. $mesg->{errorMessage}="'.
 			                     $mesg->{errorMessage}.'"';
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;
 		}
 	}
@@ -1130,8 +1130,8 @@ the scope set to base.
     my $mesg=$zconf->LDAPgetConfMessage('foo/bar');
     #gets it using $ldap for the connection
     my $mesg=$zconf->LDAPgetConfMessage('foo/bar', $ldap);
-    if($zconf->{error}){
-        print "error!";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1171,8 +1171,8 @@ the scope set to one.
     my $mesg=$zconf->LDAPgetConfMessageOne('foo/bar');
     #gets it using $ldap for the connection
     my $mesg=$zconf->LDAPgetConfMessageOne('foo/bar', $ldap);
-    if($zconf->{error}){
-        print "error!";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1217,8 +1217,8 @@ It returns undef if it is not found.
     my $entry=$zconf->LDAPgetConfEntry('foo/bar');
     #gets it using $ldap for the connection
     my $entry=$zconf->LDAPgetConfEntry('foo/bar', $ldap);
-    if($zconf->{error}){
-        print "error!";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1252,7 +1252,7 @@ sub LDAPgetConfEntry{
 
 =head2 read
 
-readFile functions just like read, but is mainly intended for internal use
+readFile methods just like read, but is mainly intended for internal use
 only. This reads the config from the LDAP backend.
 
 =head3 hash args
@@ -1272,8 +1272,8 @@ If this is not specified, it defaults to 1, true.
 The set for that config to load.
 
     $zconf->readLDAP({config=>"foo/bar"})
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1282,7 +1282,7 @@ The set for that config to load.
 sub read{
 	my $self=$_[0];
 	my %args=%{$_[1]};
-	my $function='read';
+	my $method='read';
 
 	$self->errorBlank;
 
@@ -1290,7 +1290,7 @@ sub read{
 	if (!defined($args{config})){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -1298,7 +1298,7 @@ sub read{
 	if (!defined($args{set})){
 		$self->{error}=24;
 		$self->{errorString}='$arg{set} not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -1314,20 +1314,20 @@ sub read{
 	my $entry=$self->LDAPgetConfEntry($args{config});
 	#return upon error
 	if (defined($self->{error})) {
-		warn($self->{module}.' '.$function.': LDAPgetConfEntry errored');
+		warn($self->{module}.' '.$method.': LDAPgetConfEntry errored');
 		return undef;
 	}
 
 	if(!defined($entry->dn())){
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}else{
 		if($entry->dn ne $dn){
 			$self->{error}=13;
 			$self->{errorString}="Expected DN, '".$dn."' not found.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;			
 		}
 	}
@@ -1349,7 +1349,7 @@ sub read{
 		#If we end up here, it means it is a bad LDAP enty
 		$self->{error}=13;
 		$self->{errorString}="No zconfData entry found in '".$dn."'.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;	
 	}
 
@@ -1357,7 +1357,7 @@ sub read{
 	if(!defined($data)){
 		$self->{error}=13;
 		$self->{errorString}="No matching sets found in '".$args{config}."'.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;	
 	}
 	
@@ -1372,7 +1372,7 @@ sub read{
 		$self->{error}=28;
 		$self->{errorString}='$zml->parse errored. $zml->{error}="'.$zml->{error}.'" '.
 		                     '$zml->{errorString}="'.$zml->{errorString}.'"';
-		warn($self->{module}.' '.$function.':'.$self->{errror}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{errror}.': '.$self->{errorString});
 		return undef;
 	}
 	$self->{self}->{conf}{$args{config}}=\%{$zml->{var}};
@@ -1392,7 +1392,7 @@ sub read{
 		#connects to LDAP
 		my $ldap=$self->LDAPconnect();
 		if (defined($self->{error})) {
-			warn($self->{module}.' '.$function.': LDAPconnect failed for the purpose of updating');
+			warn($self->{module}.' '.$method.': LDAPconnect failed for the purpose of updating');
 			return $self->{revision}{$args{config}};
 		}
 
@@ -1420,12 +1420,12 @@ sub read{
 
 =head2 readChooser
 
-This functions just like readChooser, but functions on the LDAP backend
+This methods just like readChooser, but methods on the LDAP backend
 and only really intended for internal use.
 
 	my $chooser = $zconf->readChooserLDAP("foo/bar");
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1433,7 +1433,7 @@ and only really intended for internal use.
 #this gets the chooser for a the config... for the file backend
 sub readChooser{
 	my ($self, $config)= @_;
-	my $function='readChooser';
+	my $method='readChooser';
 
 	$self->errorBlank;
 
@@ -1441,7 +1441,7 @@ sub readChooser{
 	if (!defined($config)) {
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -1450,7 +1450,7 @@ sub readChooser{
 	if (defined($error)) {
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1458,7 +1458,7 @@ sub readChooser{
 	if (!$self->configExists($config)) {
 		$self->{error}=12;
 		$self->{errorString}="'".$config."' does not exist.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -1476,7 +1476,7 @@ sub readChooser{
 	if (!defined($hashedmesg{$dn})) {
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1496,8 +1496,8 @@ The second arguement is the name of the set. If no set is specified, the default
 set is used. This is done by calling 'defaultSetExists'.
 
     my $return=$zconf->setExists("foo/bar", "fubar");
-    if($zconf->{error}){
-        print "Error!\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }else{
         if($return){
             print "It exists.\n";
@@ -1508,7 +1508,7 @@ set is used. This is done by calling 'defaultSetExists'.
 
 sub setExists{
 	my ($self, $config, $set)= @_;
-	my $function='setExists';
+	my $method='setExists';
 
 	#blank any errors
 	$self->errorBlank;
@@ -1557,19 +1557,19 @@ if it should be locked or unlocked
     #lock 'some/config'
     $zconf->setLockConfigLDAP('some/config', 1);
     if($zconf->{error}){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
     #unlock 'some/config'
     $zconf->setLockConfigLDAP('some/config', 0);
     if($zconf->{error}){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
     #unlock 'some/config'
     $zconf->setLockConfigLDAP('some/config');
     if($zconf->{error}){
-        print "Error!\n";
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -1578,7 +1578,7 @@ sub setLockConfig{
 	my $self=$_[0];
 	my $config=$_[1];
 	my $lock=$_[2];
-	my $function='setLockConfig';
+	my $method='setLockConfig';
 
 	$self->errorBlank;
 
@@ -1586,27 +1586,27 @@ sub setLockConfig{
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='No config specified';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
 	#makes sure it exists
 	my $exists=$self->configExists($config);
     if ($self->{error}) {
-		warn($self->{module}.' '.$function.': configExists errored');
+		warn($self->{module}.' '.$method.': configExists errored');
 		return undef;
 	}
 	if (!$exists) {
 		$self->{error}=12;
 		$self->{errorString}='The config, "'.$config.'", does not exist';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
 	my $entry=$self->LDAPgetConfEntry($config);
 	#return upon error
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': LDAPgetConfEntry errored');
+		warn($self->{module}.' '.$method.': LDAPgetConfEntry errored');
 		return undef;
 	}
 
@@ -1623,7 +1623,7 @@ sub setLockConfig{
 	#connects to LDAP
 	my $ldap=$self->LDAPconnect();
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': LDAPconnect errored... returning...');
+		warn($self->{module}.' '.$method.': LDAPconnect errored... returning...');
 		return undef;
 	}
 
@@ -1634,19 +1634,19 @@ sub setLockConfig{
 
 =head2 writeChooser
 
-This function is a internal function and largely meant to only be called
-writeChooser, which it functions the same as. It works on the LDAP backend.
+This method is a internal method and largely meant to only be called
+writeChooser, which it methods the same as. It works on the LDAP backend.
 
     $zconf->writeChooserLDAP("foo/bar", $chooserString)
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
 
 sub writeChooser{
 	my ($self, $config, $chooserstring)= @_;
-	my $function='writeChooser';
+	my $method='writeChooser';
 
 	$self->errorBlank;
 
@@ -1654,7 +1654,7 @@ sub writeChooser{
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -1662,7 +1662,7 @@ sub writeChooser{
 	if (!defined($chooserstring)){
 		$self->{error}=40;
 		$self->{errorString}='\$chooserstring not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1671,7 +1671,7 @@ sub writeChooser{
 	if(defined($error)){
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1679,20 +1679,20 @@ sub writeChooser{
 	if(!$self->configExists($config)){
 		$self->{error}=12;
 		$self->{errorString}="'".$config."' does not exist.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($config);
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': isconfigLockedLDAP errored');
+		warn($self->{module}.' '.$method.': isconfigLockedLDAP errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$config.'" is locked';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1720,13 +1720,13 @@ sub writeChooser{
 	if(!defined($entry->dn())){
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}else{
 		if($entry->dn ne $dn){
 			$self->{error}=13;
 			$self->{errorString}="Expected DN, '".$dn."' not found.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;				
 		}
 	}
@@ -1771,8 +1771,8 @@ that you don't touch this unless you really know what you
 are doing.
 
     $zconf->writeSetFromHashLDAP({config=>"foo/bar"}, \%hash)
-	if($zconf->{error}){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -1782,7 +1782,7 @@ sub writeSetFromHash{
 	my $self = $_[0];
 	my %args=%{$_[1]};
 	my %hash = %{$_[2]};
-	my $function='writeSetFromHash';
+	my $method='writeSetFromHash';
 
 	$self->errorBlank;
 
@@ -1790,7 +1790,7 @@ sub writeSetFromHash{
 	if (!defined($args{config})){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
@@ -1799,7 +1799,7 @@ sub writeSetFromHash{
 	if(defined($error)){
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1812,7 +1812,7 @@ sub writeSetFromHash{
 		}else{
 			$self->{error}=27;
 			$self->{errorString}="'".$args{set}."' is not a legit set name.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef
 		}
 	}
@@ -1821,20 +1821,20 @@ sub writeSetFromHash{
 	if(!$self->configExists($args{config})){
 		$self->{error}=12;
 		$self->{errorString}="'".$args{config}."' does not exist.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;			
 	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($args{config});
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': isconfigLockedLDAP errored');
+		warn($self->{module}.' '.$method.': isconfigLockedLDAP errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$args{config}.'" is locked';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -1865,7 +1865,7 @@ sub writeSetFromHash{
 					#checks to verify there was no error
 					#this is not a fatal error... skips it if it is not legit
 					if(defined($zml->{error})){
-						warn($self->{module}.' '.$function.':23: $zml->addMeta() returned '.
+						warn($self->{module}.' '.$method.':23: $zml->addMeta() returned '.
 							 $zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
 							 $hashkeys[$hashkeysInt]."' in '".$args{config}."'.");
 					}
@@ -1881,7 +1881,7 @@ sub writeSetFromHash{
 					#checks to verify there was no error
 					#this is not a fatal error... skips it if it is not legit
 					if(defined($zml->{error})){
-						warn($self->{module}.' '.$function.':23: $zml->addComment() returned '.
+						warn($self->{module}.' '.$method.':23: $zml->addComment() returned '.
 							 $zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
 							 $hashkeys[$hashkeysInt]."' in '".$args{config}."'.");
 					}
@@ -1893,7 +1893,7 @@ sub writeSetFromHash{
 			#checks to verify there was no error
 			#this is not a fatal error... skips it if it is not legit
 			if(defined($zml->{error})){
-				warn($self->{module}.' '.$function.':23: $zml->addVar returned '.
+				warn($self->{module}.' '.$method.':23: $zml->addVar returned '.
 					 $zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
 					 $hashkeys[$hashkeysInt]."' in '".$args{config}."'.");
 			}
@@ -1925,13 +1925,13 @@ sub writeSetFromHash{
 	if(!defined($entry->dn())){
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}else{
 		if($entry->dn ne $dn){
 			$self->{error}=13;
 			$self->{errorString}="Expected DN, '".$dn."' not found.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;				
 		}
 	}
@@ -2004,7 +2004,7 @@ sub writeSetFromHash{
 	if ($results->is_error) {
 		$self->{error}=46;
 		$self->{errorString}="Entry update failed. error='".$results->error."'";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -2016,7 +2016,7 @@ sub writeSetFromHash{
 
 =head2 writeSetFromLoadedConfig
 
-This function writes a loaded config to a to a set,
+This method writes a loaded config to a to a set,
 for the LDAP backend.
 
 One arguement is required.
@@ -2044,8 +2044,8 @@ that you don't touch this unless you really know what you
 are doing.
 
     $zconf->writeSetFromLoadedConfigLDAP({config=>"foo/bar"});
-	if(defined($zconf->{error})){
-		print 'error: '.$zconf->{error}."\n".$zconf->errorString."\n";
+	if(defined($zconf->error)){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
 
 =cut
@@ -2054,20 +2054,35 @@ are doing.
 sub writeSetFromLoadedConfig{
 	my $self = $_[0];
 	my %args=%{$_[1]};
-	my $function='writeSetFromLoadedConfig';
+	my $method='writeSetFromLoadedConfig';
 
 	$self->errorBlank;
+
+	#return false if the config is not set
+	if (!defined($args{config})){
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;			
+	}
+
+	if(! $self->isConfigLoaded( $args{config} ) ){
+		$self->{error}=25;
+		$self->{errorString}="Config '".$args{config}."' is not loaded";
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($args{config});
 	if ($self->{error}) {
-		warn($self->{module}.' '.$function.': isconfigLockedLDAP errored');
+		warn($self->{module}.' '.$method.': isconfigLockedLDAP errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$args{config}.'" is locked';
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}
 
@@ -2080,72 +2095,17 @@ sub writeSetFromLoadedConfig{
 		}else{
 			$self->{error}=27;
 			$self->{errorString}="'".$args{set}."' is not a legit set name.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef
 		}
 	}
 
-	#get a list of keys
-	my @varhashkeys=keys(%{$self->{self}->{conf}{$args{config}}});
-
-	#create the ZML object
-	my $zml=ZML->new();
-		
-	my $varhashkeysInt=0;#used for intering through the list of hash keys
-	#builds the ZML object
-	while(defined($varhashkeys[$varhashkeysInt])){
-		#attempts to add the variable
-		$zml->addVar($varhashkeys[$varhashkeysInt], 
-					$self->{self}->{conf}{$args{config}}{$varhashkeys[$varhashkeysInt]});
-		#checks to verify there was no error
-		#this is not a fatal error... skips it if it is not legit
-		if(defined($zml->{error})){
-			warn('zconf writeSetFromLoadedConfigLDAP:23: $zml->addMeta() returned '.
-				$zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
-				$varhashkeys[$varhashkeysInt]."' in '".$args{config}."'.");
-		}
-
-		$varhashkeysInt++;
-	}
-
-	#processes the meta variables
-	$varhashkeysInt=0;#used for intering through the list of hash keys
-	#builds the ZML object
-	@varhashkeys=keys(%{$self->{self}->{meta}{$args{config}}});
-	while(defined($varhashkeys[$varhashkeysInt])){
-		my @metahashkeys=keys( %{$self->{self}->{meta}{ $args{config} }{ $varhashkeys[$varhashkeysInt] }} );
-		my $metahashkeysInt=0;
-		while (defined($metahashkeys[ $metahashkeysInt ])) {
-			$zml->addMeta(
-						  $varhashkeys[$varhashkeysInt],
-						  $metahashkeys[$metahashkeysInt],
-						  $self->{self}->{meta}{ $args{config} }{ $varhashkeys[$varhashkeysInt] }{ $metahashkeys[$metahashkeysInt] }
-						  );
-			
-			$metahashkeysInt++;
-		}
-			
-		$varhashkeysInt++;
-	}
-
-	#processes the comment variables
-	$varhashkeysInt=0;#used for intering through the list of hash keys
-	#builds the ZML object
-	@varhashkeys=keys(%{$self->{self}->{comment}{$args{config}}});
-	while(defined($varhashkeys[$varhashkeysInt])){
-		my @commenthashkeys=keys( %{$self->{self}->{comment}{ $args{config} }{ $varhashkeys[$varhashkeysInt] }} );
-		my $commenthashkeysInt=0;
-		while (defined($commenthashkeys[ $commenthashkeysInt ])) {
-			$zml->addComment(
-						  $varhashkeys[$varhashkeysInt],
-						  $commenthashkeys[$commenthashkeysInt],
-						  $self->{self}->{comment}{ $args{config} }{ $varhashkeys[$varhashkeysInt] }{ $commenthashkeys[$commenthashkeysInt] }
-						  );
-			
-			$commenthashkeysInt++;
-		}
-			
-		$varhashkeysInt++;
+	my $zml=$self->{self}->dumpToZML($args{config});
+	if ($self->{self}->error) {
+			$self->{error}=14;
+			$self->{errorString}='Failed to dump to ZML. error='.$self->{self}->error.' errorString='.$self->{self}->errorString;
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			return undef		
 	}
 
 	my $setstring=$args{set}."\n".$zml->string();
@@ -2170,13 +2130,13 @@ sub writeSetFromLoadedConfig{
 	if(!defined($entry->dn())){
 		$self->{error}=13;
 		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 		return undef;
 	}else{
 		if($entry->dn ne $dn){
 			$self->{error}=13;
 			$self->{errorString}="Expected DN, '".$dn."' not found.";
-			warn($self->{module}.' '.$function.':'.$self->{error}.': '.$self->{errorString});
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef;				
 		}
 	}
@@ -2257,9 +2217,8 @@ Returns the current error code and true if there is an error.
 
 If there is no error, undef is returned.
 
-    my $error=$foo->error;
-    if($error){
-        print 'error code: '.$error."\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -2294,9 +2253,8 @@ sub errorBlank{
 Returns the error string if there is one. If there is not,
 it will return ''.
 
-    my $error=$foo->error;
-    if($error){
-        print 'error code:'.$error.': '.$foo->errorString."\n";
+    if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
 =cut
@@ -2363,19 +2321,7 @@ Expected LDAP DN not found
 
 =head2 14
 
-file/dir does not exist
-
-=head2 15
-
-file/dir open failed
-
-=head2 16
-
-file/dir creation failed
-
-=head2 17
-
-file write failed
+ZML dump failed.
 
 =head2 18
 
