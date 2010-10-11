@@ -14,11 +14,11 @@ ZConf::backends::file - A configuration system allowing for either file or LDAP 
 
 =head1 VERSION
 
-Version 0.0.1
+Version 0.0.2
 
 =cut
 
-our $VERSION = '0.0.1';
+our $VERSION = '0.0.2';
 
 =head1 SYNOPSIS
 
@@ -1074,7 +1074,7 @@ This is primarily meant for internal usage and is suggested
 that you don't touch this unless you really know what you
 are doing.
 
-    $zconf->writeSetFromHashFile({config=>"foo/bar"}, \%hash)
+    $zconf->writeSetFromHashFile({config=>"foo/bar"}, \%hash);
 	if($zconf->error){
 		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
@@ -1144,6 +1144,11 @@ sub writeSetFromHash{
 		
 	#the path to the file
 	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set};
+
+	#update the revision
+	if (!defined($args{revision})) {
+		$args{revision}=time.' '.hostname.' '.rand();
+	}
 	
 	#used for building it
 	my $zml=ZML->new;
@@ -1200,34 +1205,13 @@ sub writeSetFromHash{
 		$hashkeysInt++;
 	}
 
-	#opens the file and returns if it can not
-	#creates it if necesary
-	if(!open("THEFILE", '>', $fullpath)){
-		$self->{error}=15;
-		$self->{errorString}="'".$self->{args}{base}."/".$args{config}."/.chooser' open failed";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return undef;
+	#writes the config out
+	$args{zml}=$zml;
+	$self->writeSetFromZML(\%args);
+	if ($self->error) {
+			warn($self->{module}.' '.$method.': writeSetFromZML failed');
+			return undef		
 	}
-	print THEFILE $zml->string;
-	close("THEFILE");
-
-	#updates the revision
-	my $revisionfile=$self->{args}{base}."/".$args{config}."/.revision";
-	if (!defined($args{revision})) {
-		$args{revision}=time.' '.hostname.' '.rand();
-	}
-	#opens the file and returns if it can not
-	#creates it if necesary
-	if(!open("THEREVISION", '>', $revisionfile)){
-		$self->{error}=43;
-		$self->{errorString}="'".$revisionfile."' open failed";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return undef;
-	}
-	print THEREVISION $args{revision};
-	close("THEREVISION");
-	#saves the revision info
-	$self->{self}->{revision}{$args{config}}=$args{revision};
 
 	return $args{revision};
 }
@@ -1261,7 +1245,7 @@ This is primarily meant for internal usage and is suggested
 that you don't touch this unless you really know what you
 are doing.
 
-    $zconf->writeSetFromLoadedConfigFile({config=>"foo/bar"}, %hash)
+    $zconf->writeSetFromLoadedConfigFile({config=>"foo/bar"});
 	if($zconf->error){
 		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
@@ -1321,6 +1305,11 @@ sub writeSetFromLoadedConfig{
 	#the path to the file
 	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set};
 
+	#update the revision
+	if (!defined($args{revision})) {
+		$args{revision}=time.' '.hostname.' '.rand();
+	}
+
 	my $zml=$self->{self}->dumpToZML($args{config});
 	if ($self->{self}->error) {
 			$self->{error}=14;
@@ -1328,6 +1317,120 @@ sub writeSetFromLoadedConfig{
 			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef		
 	}
+	$args{zml}=$zml;
+
+	#writes out the config
+	$self->writeSetFromZML(\%args);
+	if ($self->error) {
+			warn($self->{module}.' '.$method.': writeSetFromZML failed');
+			return undef		
+	}
+
+	return $args{revision};
+}
+
+=head2 writeSetFromZML
+
+This writes a config set from a ZML object.
+
+One arguement is required.
+
+=head2 args hash
+
+=head3 config
+
+The config to write it to.
+
+This is required.
+
+=head3 set
+
+This is the set name to use.
+
+If not defined, the one will be choosen.
+
+=head3 revision
+
+This is the revision string to use.
+
+This is primarily meant for internal usage and is suggested
+that you don't touch this unless you really know what you
+are doing.
+
+    $zconf->writeSetFromZML({config=>"foo/bar", zml=>$zml});
+	if($zconf->error){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
+	}
+
+=cut
+
+#write a set out
+sub writeSetFromZML{
+	my $self = $_[0];
+	my %args=%{$_[1]};
+	my $method='writeSetFromZML';
+
+	$self->errorBlank;
+
+	#return false if the config is not set
+	if (!defined($args{config})){
+		$self->{error}=25;
+		$self->{errorString}='$config not defined';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;			
+	}
+
+	#makes sure ZML is passed
+	if (!defined( $args{zml} )) {
+		$self->{error}=20;
+		$self->{errorString}='$args{zml} is not defined';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+	if ( ref($args{zml}) ne "ZML" ) {
+		$self->{error}=20;
+		$self->{errorString}='$args{zml} is not a ZML';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#checks if it is locked or not
+	my $locked=$self->isConfigLocked($args{config});
+	if ($self->{error}) {
+		warn($self->{module}.' '.$method.': isconfigLockedFile errored');
+		return undef;
+	}
+	if ($locked) {
+		$self->{error}=45;
+		$self->{errorString}='The config "'.$args{config}.'" is locked';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#sets the set to default if it is not defined
+	if (!defined($args{set})){
+		$args{set}=$self->{set}{$args{config}};
+	}else{
+		if($self->{self}->setNameLegit($args{set})){
+			$self->{args}{default}=$args{set};
+		}else{
+			$self->{error}=27;
+			$self->{errorString}="'".$args{set}."' is not a legit set name.";
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			return undef
+		}
+	}
+
+	#the path to the file
+	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set};
+
+	#update the revision
+	if (!defined($args{revision})) {
+		$args{revision}=time.' '.hostname.' '.rand();
+	}
+
+	#small hack as this was copied writeSetFromLoadedConfig
+	my $zml=$args{zml};
 
 	#opens the file and returns if it can not
 	#creates it if necesary
@@ -1460,15 +1563,11 @@ config name contains a \n
 
 =head2 11
 
-LDAP entry already exists
+ZML dump failed.
 
 =head2 12
 
 config does not exist
-
-=head2 13
-
-Expected LDAP DN not found
 
 =head2 14
 
@@ -1496,7 +1595,7 @@ config key starts with a ' '
 
 =head2 20
 
-LDAP entry has no sets
+ZML object not specified.
 
 =head2 21
 

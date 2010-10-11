@@ -17,11 +17,11 @@ ZConf::backends::ldap - This provides LDAP backend for ZConf.
 
 =head1 VERSION
 
-Version 0.0.1
+Version 0.0.2
 
 =cut
 
-our $VERSION = '0.0.1';
+our $VERSION = '0.0.2';
 
 =head1 METHODS
 
@@ -72,7 +72,7 @@ sub new {
 	#zconf contains the parsed contents of zconf.zml
 	#user is space reserved for what ever the user of this package may wish to
 	#     use it for... if they ever find the need to or etc... reserved for
-	#     the prevention of poeple shoving stuff into $self->{} where ever
+ 	#     the prevention of poeple shoving stuff into $self->{} where ever
 	#     they please... probally some one still will... but this is intented
 	#     to help minimize it...
 	#error this is undef if, otherwise it is a integer for the error in question
@@ -1770,7 +1770,7 @@ This is primarily meant for internal usage and is suggested
 that you don't touch this unless you really know what you
 are doing.
 
-    $zconf->writeSetFromHashLDAP({config=>"foo/bar"}, \%hash)
+    $zconf->writeSetFromHashLDAP({config=>"foo/bar"}, \%hash);
 	if($zconf->error){
 		warn('error: '.$zconf->error.":".$zconf->errorString);
 	}
@@ -1847,7 +1847,12 @@ sub writeSetFromHash{
 	if (!defined($args{autoCreateConfig})){
 		$args{autoCreateConfig}="0";
 	}
-		
+
+	#update the revision if needed
+	if (!defined($args{revision})) {
+		$args{revision}=time.' '.hostname.' '.rand();
+	}
+
 	my $zml=ZML->new;
 
 	my $hashkeysInt=0;#used for intering through the list of hash keys
@@ -1902,114 +1907,18 @@ sub writeSetFromHash{
 		$hashkeysInt++;
 	};
 
-	#gets the setstring
-	my $setstring=$args{set}."\n".$zml->string;
-
-	#creates the DN from the config
-	my $dn=$self->config2dn($args{config}).",".$self->{args}{"ldap/base"};
-
-	#connects to LDAP
-	my $ldap=$self->LDAPconnect();
-	if (defined($self->{error})) {
-		warn('zconf writeSetFromLoadedConfigLDAP: LDAPconnect errored... returning...');
-		return undef;
-	}
-
-	#gets the LDAP entry
-	my $entry=$self->LDAPgetConfEntry($args{config}, $ldap);
-	#return upon error
-	if (defined($self->{error})) {
-		return undef;
-	}
-	
-	if(!defined($entry->dn())){
-		$self->{error}=13;
-		$self->{errorString}="Expected DN, '".$dn."' not found.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return undef;
-	}else{
-		if($entry->dn ne $dn){
-			$self->{error}=13;
-			$self->{errorString}="Expected DN, '".$dn."' not found.";
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-			return undef;				
-		}
-	}
-	
-	#makes sure the zconfSet attribute is set for the config in question
-	my @attributes=$entry->get_value('zconfSet');
-	#if the 0th is not defined, it this zconf entry is borked and it needs to have the set value added 
-	if(defined($attributes[0])){
-		#if $attributes dues contain enteries, make sure that one of them is the proper set
-		my $attributesInt=0;
-		my $setFound=0;#set to one if the loop finds the set
-		while(defined($attributes[$attributesInt])){
-			if($attributes[$attributesInt] eq $args{set}){
-				$setFound=1;
-			}
-			$attributesInt++;
-		}
-		#if the set was not found, add it
-		if(!$setFound){
-			$entry->add(zconfSet=>$args{set});
-		}
-	}else{
-		$entry->add(zconfSet=>$args{set});
-	}
-	
-	#
-	@attributes=$entry->get_value('zconfData');
-	#if the 0th is not defined, it this zconf entry is borked and it needs to have it added...  
-	if(defined($attributes[0])){
-		#if $attributes dues contain enteries, make sure that one of them is the proper set
-		my $attributesInt=0;
-		my $setFound=undef;#set to one if the loop finds the set
-		while(defined($attributes[$attributesInt])){
-			if($attributes[$attributesInt] =~ /^$args{set}\n/){
-				#delete it the attribute and readd it, if it has not been found yet...
-				#if it has been found it means this entry is borked and the duplicate
-				#set needs removed...
-				if(!$setFound){
-					$entry->delete(zconfData=>[$attributes[$attributesInt]]);
-					$entry->add(zconfData=>[$setstring]);
-				}else{
-					if($setstring ne $attributes[$attributesInt]){
-						$entry->delete(zconfData=>[$attributes[$attributesInt]]);
-					}
-				}
-				$setFound=1;
-			}
-			$attributesInt++;
-		}
-		#if the config is not found, add it
-		if(!$setFound){
-				$entry->add(zconfData=>[$setstring]);
-		}
-	}else{
-		$entry->add(zconfData=>$setstring);
-	}
-
 	#update the revision
 	if (!defined($args{revision})) {
 		$args{revision}=time.' '.hostname.' '.rand();
 	}
-	@attributes=$entry->get_value('zconfRev');
-	if (defined($attributes[0])) {
-		$entry->delete('zconfRev');		
-	}
-	$entry->add(zconfRev=>[$args{revision}]);
 
-	#write the entry to LDAP
-	my $results=$entry->update($ldap);
-	if ($results->is_error) {
-		$self->{error}=46;
-		$self->{errorString}="Entry update failed. error='".$results->error."'";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return undef;
-	}
-
-	#save the revision info
-	$self->{revision}{$args{config}}=$args{revision};
+	#write out the ZML config
+	$args{zml}=$zml;
+	$self->writeSetFromZML(\%args);
+	if ($self->error) {
+			warn($self->{module}.' '.$method.': writeSetFromZML failed');
+			return undef		
+	}	
 
 	return $args{revision};
 }
@@ -2066,7 +1975,7 @@ sub writeSetFromLoadedConfig{
 		return undef;			
 	}
 
-	if(! $self->isConfigLoaded( $args{config} ) ){
+	if(! $self->{self}->isConfigLoaded( $args{config} ) ){
 		$self->{error}=25;
 		$self->{errorString}="Config '".$args{config}."' is not loaded";
 		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
@@ -2100,6 +2009,12 @@ sub writeSetFromLoadedConfig{
 		}
 	}
 
+	#update the revision if needed
+	if (!defined($args{revision})) {
+		$args{revision}=time.' '.hostname.' '.rand();
+	}
+
+	#get the config in a ZML format
 	my $zml=$self->{self}->dumpToZML($args{config});
 	if ($self->{self}->error) {
 			$self->{error}=14;
@@ -2107,6 +2022,118 @@ sub writeSetFromLoadedConfig{
 			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
 			return undef		
 	}
+	$args{zml}=$zml;
+	
+	#write out the config
+	$self->writeSetFromZML(\%args);
+	if ($self->error) {
+			warn($self->{module}.' '.$method.': writeSetFromZML failed');
+			return undef		
+	}
+
+	return $args{revision};
+}
+
+=head2 writeSetFromZML
+
+This writes a config set from a ZML object.
+
+One arguement is required.
+
+=head2 args hash
+
+=head3 config
+
+The config to write it to.
+
+This is required.
+
+=head3 set
+
+This is the set name to use.
+
+If not defined, the one will be choosen.
+
+=head3 zml
+
+This is the ZML object to use.
+
+=head3 revision
+
+This is the revision string to use.
+
+This is primarily meant for internal usage and is suggested
+that you don't touch this unless you really know what you
+are doing.
+
+    $zconf->writeSetFromZML({config=>"foo/bar", zml=>$zml});
+	if(defined($zconf->error)){
+		warn('error: '.$zconf->error.":".$zconf->errorString);
+	}
+
+=cut
+
+#write a set out to LDAP
+sub writeSetFromZML{
+	my $self = $_[0];
+	my %args=%{$_[1]};
+	my $method='writeSetFromZML';
+
+	$self->errorBlank;
+
+	#return false if the config is not set
+	if (!defined($args{config})){
+		$self->{error}=25;
+		$self->{errorString}='$args{config} not defined';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#makes sure ZML is passed
+	if (!defined( $args{zml} )) {
+		$self->{error}=15;
+		$self->{errorString}='$args{zml} is not defined';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+	if ( ref($args{zml}) ne "ZML" ) {
+		$self->{error}=15;
+		$self->{errorString}='$args{zml} is not a ZML';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#checks if it is locked or not
+	my $locked=$self->isConfigLocked($args{config});
+	if ($self->{error}) {
+		warn($self->{module}.' '.$method.': isconfigLockedLDAP errored');
+		return undef;
+	}
+	if ($locked) {
+		$self->{error}=45;
+		$self->{errorString}='The config "'.$args{config}.'" is locked';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#sets the set to default if it is not defined
+	if (!defined($args{set})){
+		$args{set}=$self->{set}{$args{config}};
+	}else{
+		if($self->{self}->setNameLegit($args{set})){
+			$self->{args}{default}=$args{set};
+		}else{
+			$self->{error}=27;
+			$self->{errorString}="'".$args{set}."' is not a legit set name.";
+			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			return undef
+		}
+	}
+
+
+
+	#small hack as this was copied writeSetFromLoadedConfig
+	my $zml=$args{zml};
 
 	my $setstring=$args{set}."\n".$zml->string();
 
@@ -2322,6 +2349,10 @@ Expected LDAP DN not found
 =head2 14
 
 ZML dump failed.
+
+=head2 15
+
+ZML object not passed.
 
 =head2 18
 

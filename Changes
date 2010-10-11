@@ -1,5 +1,13 @@
 Revision history for ZConf
 
+4.2.0	2010-11-11/12:30
+		-Minor correction in 'MANIFEST'.
+		-Add 'initBackend' method to 'ZConf'.
+		-Rewrite 'new' method chunk to use 'initBackend'.
+		-Cleanup 'LDAPconnect' method in 'ZConf'.
+		-Add 'writeSetFromZML' method for all.
+		-All write methods for the backends now use 'writeSetFromZML'.
+
 4.1.0	2010-10-30/22:00
 		-CPAN should now show the POD for ZConf::backends::files.
 		-Add the method 'dumpToZML' and 'isConfigLoaded' to 'ZConf'.

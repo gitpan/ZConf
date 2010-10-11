@@ -4,8 +4,8 @@ Makefile.PL
 README
 TODO
 lib/ZConf.pm
-lib/ZConf/Backends/file.pm
-lib/ZConf/Backends/ldap.pm
+lib/ZConf/backends/file.pm
+lib/ZConf/backends/ldap.pm
 t/00-load.t
 t/01-load.t
 t/02-load.t
