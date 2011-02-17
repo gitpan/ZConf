@@ -51,7 +51,7 @@ This is the copy of the ZConf object intiating it.
 This is the variables found in the ~/.config/zconf.zml.
 
     my $backend=ZConf::backends::ldap->new( \%args );
-    if((!defined($zconf)) || ($zconf->{error})){
+    if($zconf->{error}){
 		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
@@ -82,6 +82,7 @@ sub new {
 				errorString=>"", meta=>{}, comment=>{}, module=>__PACKAGE__,
 				revision=>{}, locked=>{}, autoupdateGlobal=>1, autoupdate=>{}};
 	bless $self;
+	$self->{module}=~s/\:\:/\-/g;
 
 	#####################################
 	#real in the stuff from the arguments
@@ -114,55 +115,6 @@ sub new {
 	$self->{zconf}=$args{zconf};
 	#####################################
 
-	#set the config file if it is not already set
-	if(!defined($self->{args}{file})){
-		$self->{args}{file}=xdg_config_home()."/zconf.zml";
-		#Make the config file if it does not exist.
-		#We don't create it if it is manually specified as we assume
-		#that the caller manually specified it for some reason.
-		if(!-f $self->{args}{file}){
-			if(open("CREATECONFIG", '>', $self->{args}{file})){
-				print CREATECONFIG "fileonly=1\nreadfallthrough=1\n";
-				close("CREATECONFIG");
-			}else{
-				print "zconf new error: '".$self->{args}{file}."' could not be opened.\n";
-				return undef;
-			}
-		}
-	}
-
-	#do something if the base directory does not exist
-	if(! -d $self->{args}{base}){
-		#if the base diretory can not be created, exit
-		if(!mkdir($self->{args}{base})){
-			print "zconf new error: '".$self->{args}{base}.
-			      "' does not exist and could not be created.\n";
-			return undef;
-		}
-	}
-
-	my $zconfzmlstring="";#holds the contents of zconf.zml
-	#returns undef if it can't read zconf.zml
-	if(open("READZCONFZML", $self->{args}{file})){
-		$zconfzmlstring=join("", <READZCONFZML>);
-		my $tempstring;
-		close("READZCONFZML");
-	}else{
-		print "zconf new error: Could not open'".$self->{args}{file}."\n";
-		return undef;
-	}
-
-	#tries to parse the zconf.zml
-	my $zml=ZML->new();
-	$zml->parse($zconfzmlstring);
-	if($zml->{error}){
-		$self->{error}=28;
-		$self->{errorString}="ZML\-\>parse error, '".$zml->{error}."', '".$zml->{errorString}."'";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return $self;
-	}
-	$self->{zconf}=$zml->{var};
-
 	#if defaultChooser is defined, use it to find what the default should be
 	if(defined($self->{zconf}{defaultChooser})){
 		#runs choose if it is defined
@@ -185,294 +137,245 @@ sub new {
 			$self->{args}{default}="default";
 		}
 	}
-		
-	#get what the file only arg should be
-	#this is a Perl boolean value
-	if(!defined($self->{zconf}{fileonly})){
-		$self->{zconf}->{args}{fileonly}="0";
+
+	#figures out what profile to use
+	if (defined($self->{zconf}{LDAPprofileChooser})) {
+		#run the chooser to get the LDAP profile to use
+		my ($success, $choosen)=choose($self->{zconf}{LDAPprofileChooser});
+		#if the chooser fails, set the profile to default
+		if (!$success) {
+			$self->{args}{LDAPprofile}="default";
+		} else {
+			$self->{args}{LDAPprofile}=$choosen;
+		}
+	} else {
+		#if LDAPprofile is defined, use it, if not set it to default
+		if (defined($self->{zconf}{LDAPprofile})) {
+			$self->{args}{LDAPprofile}=$self->{zconf}{LDAPprofile};
+		} else {
+			$self->{args}{LDAPprofile}="default";
+		}
+	}
+
+	#will be used for auto population
+	my $autoDNs=Net::LDAP::AutoDNs->new;
+	my $autoserver=Net::LDAP::AutoServer->new;
+
+	#gets the host
+	if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/host"})){
+		$self->{args}{"ldap/host"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/host"};
 	}else{
-		$self->{args}{fileonly}=$self->{zconf}{fileonly};
-	}
-
-	if($self->{args}{fileonly} eq "0"){
-		#gets what the backend should be using backendChooser
-		#if not defined, check for backend and if that is not
-		#defined, just use the file backend
-		if(defined($self->{zconf}{backendChooser})){
-			my ($success, $choosen)=choose($self->{zconf}{backendChooser});
-			if($success){
-				$self->{args}{backend}=$choosen;
-			}else{
-				if(defined{$self->{zconf}{backend}}){
-					$self->{args}{backend}=$self->{zconf}{backend};
-				}else{
-					$self->{args}{backend}="file";
-				}
-			}
-		}else{
-			if(defined($self->{zconf}{backend})){
-				$self->{args}{backend}=$self->{zconf}{backend};
-			}else{
-				$self->{args}{backend}="file";
-			}
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{server} )) {
+			$self->{args}{'ldap/host'}=$autoserver->{server};
+		}else {
+			$self->{args}{'ldap/host'}='127.0.0.1';
 		}
+	}
+	
+	#gets the capath
+	if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/capath"})){
+		$self->{args}{"ldap/capath"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/capath"};
 	}else{
-		$self->{args}{backend}="file";
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{CApath} )) {
+			$self->{args}{"ldap/capath"}=$autoserver->{CApath};
+		}else {
+			$self->{args}{"ldap/capath"}=undef;
+		}
 	}
-		
-	#make sure the backend is legit
-	my @backends=("file", "ldap");
-	my $backendLegit=0;
-	my $backendsInt=0;
-	while(defined($backends[$backendsInt])){
-		if ($backends[$backendsInt] eq $self->{args}{backend}){
-			$backendLegit=1;
+	
+	#gets the cafile
+	if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/cafile"})){
+		$self->{args}{"ldap/cafile"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/cafile"};
+	}else{
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{CAfile} )) {
+			$self->{args}{"ldap/cafile"}=$autoserver->{CAfile};
+		}else {
+			$self->{args}{"ldap/cafile"}=undef;
 		}
-
-		$backendsInt++;
+	}
+	
+	#gets the checkcrl
+	if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/checkcrl"})){
+		$self->{args}{"ldap/checkcrl"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/checkcrl"};
+	}else{
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{checkCRL} )) {
+			$self->{args}{"ldap/checkcrl"}=$autoserver->{checkCRL};
+		}else {
+			$self->{args}{"ldap/checkcrl"}=undef;
+		}
+	}
+	
+	#gets the clientcert
+	if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientcert"})){
+		$self->{args}{"ldap/clientcert"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientcert"};
+	}else{
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{clientCert} )) {
+			$self->{args}{"ldap/clientcert"}=$autoserver->{clientCert};
+		}else {
+			$self->{args}{"ldap/clientcert"}=undef;
+		}
 	}
 
-	if(!$backendLegit){
-		warn("zconf new error: The backend '".$self->{args}{backend}.
-			 "' is not a recognized backend.\n");
-		return undef;
+	#gets the clientkey
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientkey"})) {
+		$self->{args}{"ldap/clientkey"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientkey"};
+	} else {
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{clientKey} )) {
+			$self->{args}{"ldap/clientkey"}=$autoserver->{clientKey};
+		} else {
+			$self->{args}{"ldap/clientkey"}=undef;
+		}
 	}
-		
-	#real in the LDAP settings
-	if($self->{args}{backend} eq "ldap"){
-		#figures out what profile to use
-		if(defined($self->{zconf}{LDAPprofileChooser})){
-			#run the chooser to get the LDAP profile to use
-			my ($success, $choosen)=choose($self->{zconf}{LDAPprofileChooser});
-			#if the chooser fails, set the profile to default
-			if(!$success){
-				$self->{args}{LDAPprofile}="default";
-			}else{
-				$self->{args}{LDAPprofile}=$choosen;
-			}
-		}else{
-			#if LDAPprofile is defined, use it, if not set it to default
-			if(defined($self->{zconf}{LDAPprofile})){
-				$self->{args}{LDAPprofile}=$self->{zconf}{LDAPprofile};
-			}else{
-				$self->{args}{LDAPprofile}="default";
-			}
+
+	#gets the starttls
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/starttls"})) {
+		$self->{args}{"ldap/starttls"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/starttls"};
+	} else {
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{startTLS} )) {
+			$self->{args}{"ldap/starttls"}=$autoserver->{startTLS};
+		} else {
+			$self->{args}{"ldap/starttls"}=undef;
 		}
+	}
 
-		#will be used for auto population
-		my $autoDNs=Net::LDAP::AutoDNs->new;
-		my $autoserver=Net::LDAP::AutoServer->new;
+	#gets the TLSverify
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/TLSverify"})) {
+		$self->{args}{"ldap/TLSverify"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/TLSverify"};
+	} else {
+		#sets it to localhost if not defined
+		$self->{args}{"ldap/TLSverify"}='none';
+	}
 
-		#gets the host
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/host"})){
-			$self->{args}{"ldap/host"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/host"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{server} )) {
-				$self->{args}{'ldap/host'}=$autoserver->{server};
-			}else {
-				$self->{args}{'ldap/host'}='127.0.0.1';
-			}
+	#gets the SSL version to use
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLversion"})) {
+		$self->{args}{"ldap/SSLversion"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLversion"};
+	} else {
+		#sets it to localhost if not defined
+		$self->{args}{"ldap/SSLversion"}='tlsv1';
+	}
+
+	#gets the SSL ciphers to use
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLciphers"})) {
+		$self->{args}{"ldap/SSLciphers"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLciphers"};
+	} else {
+		#sets it to localhost if not defined
+		$self->{args}{"ldap/SSLciphers"}='ALL';
+	}
+
+	#gets the password value to use
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"})) {
+		$self->{args}{"ldap/password"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"};
+	} else {
+		#sets it to localhost if not defined
+		if (defined( $autoserver->{pass} )) {
+			$self->{args}{"ldap/password"}=$autoserver->{pass};
+		} else {
+			$self->{args}{"ldap/password"}="";
 		}
+	}
 
-		#gets the capath
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/capath"})){
-			$self->{args}{"ldap/capath"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/capath"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{CApath} )) {
-				$self->{args}{"ldap/capath"}=$autoserver->{CApath};
-			}else {
-				$self->{args}{"ldap/capath"}=undef;
-			}
+	#gets the password value to use
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/passwordfile"})) {
+		$self->{args}{"ldap/passwordfile"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/passwordfile"};
+		if (open( PASSWORDFILE,  $self->{args}{"ldap/passwordfile"} )) {
+			$self->{args}{"ldap/password"}=join( "\n", <PASSWORDFILE> );
+			close(PASSWORDFILE);
+		} else {
+			warn($self->{module}.' '.$method.': Failed to open the password file, "'.
+				 $self->{args}{"ldap/passwordfile"}.'",');
 		}
+	}
 
-		#gets the cafile
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/cafile"})){
-			$self->{args}{"ldap/cafile"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/cafile"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{CAfile} )) {
-				$self->{args}{"ldap/cafile"}=$autoserver->{CAfile};
-			}else {
-				$self->{args}{"ldap/cafile"}=undef;
-			}
+	#gets the home DN
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/homeDN"})) {
+		$self->{args}{"ldap/homeDN"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/homeDN"};
+	} else {
+		if (defined( $autoDNs->{home} )) {
+			$self->{args}{"ldap/homeDN"}='ou='.$ENV{USER}.','.$autoDNs->{home};
+		} else {
+			$self->{args}{"ldap/homeDN"}=`hostname`;
+			chomp($self->{args}{"ldap/bind"});
+			#the next three lines can result in double comas.
+			$self->{args}{"ldap/homeDN"}=~s/^.*\././ ;
+			$self->{args}{"ldap/homeDN"}=~s/\./,dc=/g ;
+			$self->{args}{"ldap/homeDN"}="ou=".$ENV{USER}.",ou=home,".$self->{args}{"ldap/bind"};
+			#remove any double comas if they crop up
+			$self->{args}{"ldap/homeDN"}=~s/,,/,/g;
 		}
+	}
 
-		#gets the checkcrl
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/checkcrl"})){
-			$self->{args}{"ldap/checkcrl"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/checkcrl"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{checkCRL} )) {
-				$self->{args}{"ldap/checkcrl"}=$autoserver->{checkCRL};
-			}else {
-				$self->{args}{"ldap/checkcrl"}=undef;
-			}
-		}
-
-		#gets the clientcert
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientcert"})){
-			$self->{args}{"ldap/clientcert"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientcert"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{clientCert} )) {
-				$self->{args}{"ldap/clientcert"}=$autoserver->{clientCert};
-			}else {
-				$self->{args}{"ldap/clientcert"}=undef;
-			}
-		}
-
-		#gets the clientkey
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientkey"})){
-			$self->{args}{"ldap/clientkey"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/clientkey"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{clientKey} )) {
-				$self->{args}{"ldap/clientkey"}=$autoserver->{clientKey};
-			}else {
-				$self->{args}{"ldap/clientkey"}=undef;
-			}
-		}
-
-		#gets the starttls
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/starttls"})){
-			$self->{args}{"ldap/starttls"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/starttls"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{startTLS} )) {
-				$self->{args}{"ldap/starttls"}=$autoserver->{startTLS};
-			}else {
-				$self->{args}{"ldap/starttls"}=undef;
-			}
-		}
-
-		#gets the TLSverify
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/TLSverify"})){
-			$self->{args}{"ldap/TLSverify"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/TLSverify"};
-		}else{
-			#sets it to localhost if not defined
-			$self->{args}{"ldap/TLSverify"}='none';
-		}
-
-		#gets the SSL version to use
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLversion"})){
-			$self->{args}{"ldap/SSLversion"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLversion"};
-		}else{
-			#sets it to localhost if not defined
-			$self->{args}{"ldap/SSLversion"}='tlsv1';
-		}
-
-		#gets the SSL ciphers to use
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLciphers"})){
-			$self->{args}{"ldap/SSLciphers"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/SSLciphers"};
-		}else{
-			#sets it to localhost if not defined
-			$self->{args}{"ldap/SSLciphers"}='ALL';
-		}
-
-		#gets the password value to use
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"})){
-			$self->{args}{"ldap/password"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/password"};
-		}else{
-			#sets it to localhost if not defined
-			if (defined( $autoserver->{pass} )) {
-				$self->{args}{"ldap/password"}=$autoserver->{pass};
-			}else {
-				$self->{args}{"ldap/password"}="";
-			}
-		}
-
-		#gets the password value to use
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/passwordfile"})){
-			$self->{args}{"ldap/passwordfile"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/passwordfile"};
-			if (open( PASSWORDFILE,  $self->{args}{"ldap/passwordfile"} )) {
-				$self->{args}{"ldap/password"}=join( "\n", <PASSWORDFILE> );
-				close(PASSWORDFILE);
-			}else {
-				warn($self->{module}.' '.$method.': Failed to open the password file, "'.
-					 $self->{args}{"ldap/passwordfile"}.'",');
-			}
-		}
-
-		#gets bind to use
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/bind"})){
-			$self->{args}{"ldap/bind"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/bind"};
-		}else{
-			if (defined( $autoserver->{bind} )) {
-				$self->{args}{"ldap/bind"}=$autoserver->{bind};
-			}else {
-				$self->{args}{"ldap/bind"}=hostname;
-				chomp($self->{args}{"ldap/bind"});
-				#the next three lines can result in double comas.
-				$self->{args}{"ldap/bind"}=~s/^[0-9a-zA-Z\-\_]*\././ ;
-				$self->{args}{"ldap/bind"}=~s/\./,dc=/g ;
-				$self->{args}{"ldap/bind"}="uid=".$ENV{USER}.",ou=users,".$self->{args}{"ldap/bind"};
-				#remove any double comas if they crop up
-				$self->{args}{"ldap/bind"}=~s/,,/,/g;
-			}
-		}
-
-		#gets bind to use
-		if(defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/homeDN"})){
-			$self->{args}{"ldap/homeDN"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/homeDN"};
-		}else{
-			if (defined( $autoDNs->{home} )) {
-				$self->{args}{"ldap/homeDN"}='ou='.$ENV{USER}.','.$autoDNs->{home};
-			}else {
-				$self->{args}{"ldap/homeDN"}=`hostname`;
-				chomp($self->{args}{"ldap/bind"});
-				#the next three lines can result in double comas.
-				$self->{args}{"ldap/homeDN"}=~s/^.*\././ ;
-				$self->{args}{"ldap/homeDN"}=~s/\./,dc=/g ;
-				$self->{args}{"ldap/homeDN"}="ou=".$ENV{USER}.",ou=home,".$self->{args}{"ldap/bind"};
-				#remove any double comas if they crop up
-				$self->{args}{"ldap/homeDN"}=~s/,,/,/g;
-			}
-		}
-
-		#this holds the DN that is the base for everything done
+	#get the LDAP base
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/base"})) {
+		$self->{args}{"ldap/base"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/base"};
+	}else {
 		$self->{args}{"ldap/base"}="ou=zconf,ou=.config,".$self->{args}{"ldap/homeDN"};
+	}
 
+	#gets bind to use
+	if (defined($self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/bind"})) {
+		$self->{args}{"ldap/bind"}=$self->{zconf}{"ldap/".$self->{args}{LDAPprofile}."/bind"};
+	} else {
+		if (defined( $autoserver->{bind} )) {
+			$self->{args}{"ldap/bind"}=$autoserver->{bind};
+		} else {
+			$self->{args}{"ldap/bind"}=hostname;
+			chomp($self->{args}{"ldap/bind"});
+			#the next three lines can result in double comas.
+			$self->{args}{"ldap/bind"}=~s/^[0-9a-zA-Z\-\_]*\././ ;
+			$self->{args}{"ldap/bind"}=~s/\./,dc=/g ;
+			$self->{args}{"ldap/bind"}="uid=".$ENV{USER}.",ou=users,".$self->{args}{"ldap/bind"};
+			#remove any double comas if they crop up
+			$self->{args}{"ldap/bind"}=~s/,,/,/g;
+		}
+	
 		#tests the connection
 		my $ldap=$self->LDAPconnect;
-		if ($self->{error}) {
-			warn('ZConf new: LDAPconnect errored');
-			return undef;
+		if ($self->error) {
+			warn($self->{module}.' '.$method.':'.$self->error.': '.$self->errorString);
+			return $self;
 		}
-
+	
 		#tests if "ou=.config,".$self->{args}{"ldap/homeDN"} exists or nnot...
 		#if it does not, try to create it...
 		my $ldapmesg=$ldap->search(scope=>"base", base=>"ou=.config,".$self->{args}{"ldap/homeDN"},
-								filter => "(objectClass=*)");
+								   filter => "(objectClass=*)");
 		my %hashedmesg=LDAPhash($ldapmesg);
-		if(!defined($hashedmesg{"ou=.config,".$self->{args}{"ldap/homeDN"}})){
+		if (!defined($hashedmesg{"ou=.config,".$self->{args}{"ldap/homeDN"}})) {
 			my $entry = Net::LDAP::Entry->new();
 			$entry->dn("ou=.config,".$self->{args}{"ldap/homeDN"});
 			$entry->add(objectClass => [ "top", "organizationalUnit" ], ou=>".config");
 			my $result = $ldap->update($entry);
-			if($ldap->error()){
-		    	warn("zconf ldap init error: ".$self->{args}{"ldap/base"}." ".$ldap->error.
-         				"; code ",$ldap->errcode);
-       			return undef;
+			if ($ldap->error()) {
+				$self->{error}=16;
+				$self->{errorString}="Unable to create one of the required entries for initializing this backend.  error: ".$self->{args}{"ldap/base"}." ".$ldap->error."; code ",$ldap->errcode;
+				warn($self->{module}.' '.$method.':'.$self->error.': '.$self->errorString);
+				return $self;
 			}
 		}
-
+	
 		#tests if "ldap/base" exists... try to create it if it does not
 		$ldapmesg=$ldap->search(scope=>"base", base=>$self->{args}{"ldap/base"},filter => "(objectClass=*)");
 		%hashedmesg=LDAPhash($ldapmesg);
-		if(!defined($hashedmesg{$self->{args}{"ldap/base"}})){
+		if (!defined($hashedmesg{$self->{args}{"ldap/base"}})) {
 			my $entry = Net::LDAP::Entry->new();
 			$entry->dn($self->{args}{"ldap/base"});
 			$entry->add(objectClass => [ "top", "organizationalUnit" ], ou=>"zconf");
 			my $result = $ldap->update($entry);
-			if($ldap->error()){
-		    	warn("zconf ldap init error: ".$self->{args}{"ldap/base"}." ".$ldap->error.
-         				"; code ",$ldap->errcode);
-       			return undef;
+			if ($ldap->error()) {
+				$self->{error}=16;
+				$self->{errorString}="Unable to create one of the required entries for initializing this backend.  error: ".$self->{args}{"ldap/base"}." ".$ldap->error."; code ",$ldap->errcode;
+				warn($self->{module}.' '.$method.':'.$self->error.': '.$self->errorString);
+				return $self;
 			}
 		}
-		
+	
 		#disconnects from the LDAP server
 		$ldap->unbind;
 	}
@@ -2353,6 +2256,10 @@ ZML dump failed.
 =head2 15
 
 ZML object not passed.
+
+=head2 16
+
+Unable to create some of the required DN entries.
 
 =head2 18
 

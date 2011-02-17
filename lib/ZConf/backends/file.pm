@@ -14,11 +14,11 @@ ZConf::backends::file - A configuration system allowing for either file or LDAP 
 
 =head1 VERSION
 
-Version 0.0.2
+Version 1.0.0
 
 =cut
 
-our $VERSION = '0.0.2';
+our $VERSION = '1.0.0';
 
 =head1 SYNOPSIS
 
@@ -41,12 +41,6 @@ When it is run for the first time, it creates a filesystem only config file.
 
 =head3 args hash
 
-=head4 sys
-
-This turns system mode on. And sets it to the specified system name.
-
-This is incompatible with the file option.
-
 =head4 self
 
 This is the copy of the ZConf object intiating it.
@@ -56,7 +50,7 @@ This is the copy of the ZConf object intiating it.
 This is the variables found in the ~/.config/zconf.zml.
 
     my $zconf=ZConf::backends::file->new(\%args);
-    if((!defined($zconf)) || ($zconf->{error})){
+    if($zconf->{error}){
 		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
@@ -87,6 +81,7 @@ sub new {
 				errorString=>"", meta=>{}, comment=>{}, module=>__PACKAGE__,
 				revision=>{}, locked=>{}, autoupdateGlobal=>1, autoupdate=>{}};
 	bless $self;
+	$self->{module}=~s/\:\:/\-/g;
 
 	#####################################
 	#real in the stuff from the arguments
@@ -119,73 +114,20 @@ sub new {
 	$self->{zconf}=$args{zconf};
 	#####################################
 
-	#sets the base directory
-	if (!defined($self->{args}{sys})) {
+	if (!defined( $self->{zconf}{'file/base'} )) {
 		$self->{args}{base}=xdg_config_home()."/zconf/";
 	}else {
-		$self->{args}{base}='/var/db/zconf/'.$self->{args}{sys};
-
-		#make sure it will only be one directory
-		if ($self->{args}{sys} =~ /\//) {
-				$self->{error}='38';
-				$self->{errorString}='Sys name,"'.$self->{args}{base}.'", matches /\//';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-		}
-
-		#make sure it is not hidden
-		if ($self->{args}{sys} =~ /\./) {
-				$self->{error}='39';
-				$self->{errorString}='Sys name,"'.$self->{args}{base}.'", matches /\./';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-		}
-
-		#make sure the system directory exists
-		if (!-d '/var/db/zconf') {
-			if (!mkdir('/var/db/zconf')) {
-				$self->{error}='36';
-				$self->{errorString}='Could not create "/var/db/zconf/"';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-			}
-		}
-
-		#make sure the 
-		if (!-d $self->{args}{base}) {
-			if (!mkdir($self->{args}{base})) {
-				$self->{error}='37';
-				$self->{errorString}='Could not create "'.$self->{args}{base}.'"';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-			}
-		}
-	}
-
-	#set the config file if it is not already set
-	if(!defined($self->{args}{file})){
-		$self->{args}{file}=xdg_config_home()."/zconf.zml";
-		#Make the config file if it does not exist.
-		#We don't create it if it is manually specified as we assume
-		#that the caller manually specified it for some reason.
-		if(!-f $self->{args}{file}){
-			if(open("CREATECONFIG", '>', $self->{args}{file})){
-				print CREATECONFIG "fileonly=1\nreadfallthrough=1\n";
-				close("CREATECONFIG");
-			}else{
-				print "zconf new error: '".$self->{args}{file}."' could not be opened.\n";
-				return undef;
-			}
-		}
+		$self->{args}{base}=$self->{zconf}{'file/base'};
 	}
 
 	#do something if the base directory does not exist
 	if(! -d $self->{args}{base}){
 		#if the base diretory can not be created, exit
 		if(!mkdir($self->{args}{base})){
-			print "zconf new error: '".$self->{args}{base}.
-			      "' does not exist and could not be created.\n";
-			return undef;
+			$self->{error}=46;
+			$self->{errorString}="'".$self->{args}{base}."' does not exist and could not be created.\n";
+			warn($self->{module}.' '.$method.':'.$self->error.': '.$self->errorString);
+			return $self;
 		}
 	}
 
@@ -1699,7 +1641,7 @@ Config is locked.
 
 =head2 46
 
-LDAP entry update failed.
+The base does not exist or could not be created.
 
 =head2 47
 
@@ -1724,16 +1666,19 @@ ZML for more information on the file format. The keys are listed below.
 
 =head3 backend
 
-This should be set to 'ldap' to use this backend.
+This should be set to 'file' to use this backend.
 
-=head1 SYSTEM MODE
+=head3 fileonly
 
-This is for deamons or the like. This will read
-'/var/db/zconf/$sys/zconf.zml' for it's options and store
-the file backend stuff in '/var/db/zconf/$sys/'.
+This is a boolean value. If it is set to 1, only the file backend is used.
 
-It will create '/var/db/zconf' or the sys directory, but not
-'/var/db'.
+This will override 'backend'.
+
+Basically the same as using the backend to 'file'.
+
+=head3 file/base
+
+This is the base directory to use for storing the configs in.
 
 =head1 AUTHOR
 

@@ -113,6 +113,11 @@ if (!defined($opts{k})) {
 	exit 254;
 }
 
+#only do regexp if needed
+if (!defined($opts{r})) {
+	$opts{k}='^'.quotemeta($opts{k}).'$';
+}
+
 #handles misc stuff for comments
 if (defined($opts{C})) {
 	if (!defined($opts{K})) {
@@ -121,8 +126,7 @@ if (defined($opts{C})) {
 	}
 
 	if (!defined($opts{r})) {
-		$opts{k}='^'.$opts{k}.'$';
-		$opts{K}='^'.$opts{K}.'$';
+		$opts{K}='^'.quotemeta($opts{K}).'$';
 	}
 }
 
@@ -134,8 +138,7 @@ if (defined($opts{m})) {
 	}
 
 	if (!defined($opts{r})) {
-		$opts{k}='^'.$opts{k}.'$';
-		$opts{K}='^'.$opts{K}.'$';
+		$opts{K}='^'.quotemeta($opts{K}).'$';
 	}
 }
 

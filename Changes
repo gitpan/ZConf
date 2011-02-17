@@ -1,5 +1,11 @@
 Revision history for ZConf
 
+5.0.0	2011-02-17/06:30
+		-Cleanup initialization of the new methods. The backends will also never return undef now.
+		-'bin/zcget' now does proper regex escaping unless -r is specified.
+		-Remove sysmode. Everything it use to do can now be done via specifying a config file and setting the base stuff.
+		-Add ZConf->getVar, ZConf->getMeta, ZConf->getComment.
+
 4.2.1	2011-02-14/18:30
 		-"bin/zccdump" added. This should of been added previously, but was not do to a commit error.
 

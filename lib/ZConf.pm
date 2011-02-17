@@ -15,11 +15,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 4.2.1
+Version 5.0.0
 
 =cut
 
-our $VERSION = '4.2.1';
+our $VERSION = '5.0.0';
 
 =head1 SYNOPSIS
 
@@ -44,15 +44,9 @@ When it is run for the first time, it creates a filesystem only config file.
 
 =head4 file
 
-The default is 'xdf_config_home/zconf.zml', which is generally '~/.config/zconf.zml'.
+The default is xdf_config_home."/zconf.zml", which is generally '~/.config/zconf.zml'.
 
 This is incompatible with the sys option.
-
-=head4 sys
-
-This turns system mode on. And sets it to the specified system name.
-
-This is incompatible with the file option.
 
     my $zconf=ZConf->new();
     if($zconf->error){
@@ -87,56 +81,6 @@ sub new {
 				revision=>{}, locked=>{}, autoupdateGlobal=>1, autoupdate=>{}};
 	bless $self;
 
-	if (defined($self->{args}{file}) && defined($self->{args}{sysmode})) {
-		$self->{error}=35;
-		$self->{errorString}='sys and file can not be specified together';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return undef;
-	}
-
-	#sets the base directory
-	if (!defined($self->{args}{sys})) {
-		$self->{args}{base}=xdg_config_home()."/zconf/";
-	}else {
-		$self->{args}{base}='/var/db/zconf/'.$self->{args}{sys};
-
-		#make sure it will only be one directory
-		if ($self->{args}{sys} =~ /\//) {
-				$self->{error}='38';
-				$self->{errorString}='Sys name,"'.$self->{args}{base}.'", matches /\//';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-		}
-
-		#make sure it is not hidden
-		if ($self->{args}{sys} =~ /\./) {
-				$self->{error}='39';
-				$self->{errorString}='Sys name,"'.$self->{args}{base}.'", matches /\./';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-		}
-
-		#make sure the system directory exists
-		if (!-d '/var/db/zconf') {
-			if (!mkdir('/var/db/zconf')) {
-				$self->{error}='36';
-				$self->{errorString}='Could not create "/var/db/zconf/"';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-			}
-		}
-
-		#make sure the 
-		if (!-d $self->{args}{base}) {
-			if (!mkdir($self->{args}{base})) {
-				$self->{error}='37';
-				$self->{errorString}='Could not create "'.$self->{args}{base}.'"';
-				warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-				return $self;
-			}
-		}
-	}
-
 	#set the config file if it is not already set
 	if(!defined($self->{args}{file})){
 		$self->{args}{file}=xdg_config_home()."/zconf.zml";
@@ -151,16 +95,6 @@ sub new {
 				print "zconf new error: '".$self->{args}{file}."' could not be opened.\n";
 				return undef;
 			}
-		}
-	}
-
-	#do something if the base directory does not exist
-	if(! -d $self->{args}{base}){
-		#if the base diretory can not be created, exit
-		if(!mkdir($self->{args}{base})){
-			print "zconf new error: '".$self->{args}{base}.
-			      "' does not exist and could not be created.\n";
-			return undef;
 		}
 	}
 
@@ -1440,6 +1374,218 @@ sub getSubConfigs{
 	}
 
 	return @returned;
+}
+
+=head2 getComment
+
+This requires three arguments.
+
+The first is the name of the config.
+
+The second is the variable.
+
+The third is the comment name.
+
+If the comment does not exist, undef is returned. It is also possible it errored, but
+a non-existant variable is not considered a error.
+
+    my $value=$zconf->getVar($someConfig, $someVariable, $someComment);
+    if($zconf->error){
+        warn('error: '.$zconf->error.":".$zconf->errorString);
+    }
+    if(!defined($value)){
+        print "'.$someVariable.' and/or '".$someComment."' does not exist\n";
+    }
+
+=cut
+
+sub getComment{
+	my ($self, $config, $var, $comment) = @_;
+	my $method='getComment';
+
+	$self->errorBlank;
+
+	#update if if needed
+	$self->updateIfNeeded({config=>$config, clearerror=>1, autocheck=>1 });
+
+	#return false if the config is not set
+	if (!defined($config)){
+		$self->{error}=25;
+		$self->{errorString}='No config specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;			
+	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$config."' is not loaded.";
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#make sure we have a variable
+	if (!defined($var)) {
+		$self->{error}=18;
+		$self->{errorString}='No variable specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#makes sure we have a comment specified
+	if (!defined($comment)) {
+		$self->{error}=41;
+		$self->{errorString}='No comment specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#make sure it exists
+	if (!defined( $self->{comment}{$config}{$var} )) {
+		return undef;
+	}
+	if (!defined( $self->{comment}{$config}{$var}{$comment} )) {
+		return undef;
+	}
+
+	return $self->{comment}{$config}{$var}{$comment};
+}
+
+=head2 getMeta
+
+This requires three arguments.
+
+The first is the name of the config.
+
+The second is the variable.
+
+The third is the meta name.
+
+If the comment does not exist, undef is returned. It is also possible it errored, but
+a non-existant variable is not considered a error.
+
+    my $value=$zconf->getVar($someConfig, $someVariable, $someMeta);
+    if($zconf->error){
+        warn('error: '.$zconf->error.":".$zconf->errorString);
+    }
+    if(!defined($value)){
+        print "'.$someVariable.' and/or '".$someMeta."' does not exist\n";
+    }
+
+=cut
+
+sub getMeta{
+	my ($self, $config, $var, $meta) = @_;
+	my $method='getMeta';
+
+	$self->errorBlank;
+
+	#update if if needed
+	$self->updateIfNeeded({config=>$config, clearerror=>1, autocheck=>1 });
+
+	#return false if the config is not set
+	if (!defined($config)){
+		$self->{error}=25;
+		$self->{errorString}='No config specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;			
+	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$config."' is not loaded.";
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#make sure we have a variable
+	if (!defined($var)) {
+		$self->{error}=18;
+		$self->{errorString}='No variable specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#makes sure we have a meta specified
+	if (!defined($meta)) {
+		$self->{error}=42;
+		$self->{errorString}='No meta specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#make sure it exists
+	if (!defined( $self->{meta}{$config}{$var} )) {
+		return undef;
+	}
+	if (!defined( $self->{meta}{$config}{$var}{$meta} )) {
+		return undef;
+	}
+
+	return $self->{meta}{$config}{$var}{$meta};
+}
+
+=head2 getVar
+
+This reqyures two arguments.
+
+The first is the name of the config.
+
+The second is the variable.
+
+If the variable does not exist, undef is returned. It is also possible it errored, but
+a non-existant variable is not considered a error.
+
+    my $value=$zconf->getVar($someConfig, $someVariable);
+    if($zconf->error){
+        warn('error: '.$zconf->error.":".$zconf->errorString);
+    }
+    if(!defined($value)){
+        print "'.$someVariable.' does not exist\n";
+    }
+
+=cut
+
+sub getVar{
+	my ($self, $config, $var) = @_;
+	my $method='getVar';
+
+	$self->errorBlank;
+
+	#update if if needed
+	$self->updateIfNeeded({config=>$config, clearerror=>1, autocheck=>1 });
+
+	#return false if the config is not set
+	if (!defined($config)){
+		$self->{error}=25;
+		$self->{errorString}='No config specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;			
+	}
+
+	#makes sure it is loaded
+	if ( ! $self->isConfigLoaded($config) ) {
+		$self->{error}=26;
+		$self->{errorString}="Config '".$config."' is not loaded.";
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#make sure we have a variable
+	if (!defined($var)) {
+		$self->{error}=18;
+		$self->{errorString}='No variable specified';
+		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		return undef;
+	}
+
+	#make sure it exists
+	if (!defined( $self->{conf}{$config}{$var} )) {
+		return undef;
+	}
+
+	return $self->{conf}{$config}{$var};
 }
 
 =head2 initBackend
@@ -4293,15 +4439,6 @@ If this is set, if any of the methods below error when trying the any backend ot
     read
     readChooser
 
-=head1 SYSTEM MODE
-
-This is for deamons or the like. This will read
-'/var/db/zconf/$sys/zconf.zml' for it's options and store
-the file backend stuff in '/var/db/zconf/$sys/'.
-
-It will create '/var/db/zconf' or the sys directory, but not
-'/var/db'.
-
 =head1 UTILITIES
 
 There are several scripts installed with this module. Please see the perldocs for
@@ -4321,11 +4458,9 @@ the utilities listed below.
 
 =head1 Backend Requirements
 
-=head2 Required Methods
+Coming shortly.
 
-=head3 new
-
-=head4 
+This will be documented more shortly.
 
 =head1 AUTHOR
 
