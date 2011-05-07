@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#Copyright (c) 2009, Zane C. Bowers
+#Copyright (c) 2011, Zane C. Bowers-Hadley
 #All rights reserved.
 #
 #Redistribution and use in source and binary forms, with or without modification,
@@ -37,13 +37,12 @@ sub main::VERSION_MESSAGE {
 #print help
 sub main::HELP_MESSAGE {
 	print "\n".
-	      "-c <config>  The config to operate on.\n".
-		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
+	      "-c <config>  The config to operate on.\n";
 }
 
 #gets the options
 my %opts=();
-getopts('c:S:', \%opts);
+getopts('c:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
@@ -54,7 +53,7 @@ if (!defined($opts{c})) {
 #if -f is set, read it
 
 #inits zconf
-my $zconf = ZConf->new({sys=>$opts{S}});
+my $zconf = ZConf->new();
 if($zconf->{error}){
 	exit $zconf->{error};
 }
@@ -81,7 +80,7 @@ zcchooser-run - Runs the chooser for the specified config.
 
 =head1 SYNOPSIS
 
-zcchooser-run B<-c> <config> [B<-S> <sys>]
+zcchooser-run B<-c> <config>
 
 =head1 SWTICHES
 
@@ -103,7 +102,7 @@ No config specified.
 
 =head1 AUTHOR
 
-Copyright (c) 2009, Zame C. Bowers <vvelox@vvelox.net>
+Copyright (c) 2011, Zame C. Bowers-Hadley <vvelox@vvelox.net>
 
 All rights reserved.
 

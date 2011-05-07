@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#Copyright (c) 2008, Zane C. Bowers
+#Copyright (c) 2011, Zane C. Bowers-Hadley
 #All rights reserved.
 #
 #Redistribution and use in source and binary forms, with or without modification,
@@ -31,7 +31,7 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 #version function
 sub main::VERSION_MESSAGE {
-	print "zccdump 0.0.0\n";
+	print "zccdump 0.0.1\n";
 }
 
 #print help
@@ -43,7 +43,7 @@ sub main::HELP_MESSAGE {
 
 #gets the options
 my %opts=();
-getopts('s:c::', \%opts);
+getopts('s:c:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
@@ -73,7 +73,6 @@ if ($zconf->error) {
 print $zml->string;
 
 exit 0;
-
 
 =head1 NAME
 

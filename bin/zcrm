@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#Copyright (c) 2008, Zane C. Bowers
+#Copyright (c) 2011, Zane C. Bowers-Hadley
 #All rights reserved.
 #
 #Redistribution and use in source and binary forms, with or without modification,
@@ -38,13 +38,12 @@ sub main::VERSION_MESSAGE {
 sub main::HELP_MESSAGE {
 	print "\n".
 	      "-c <config>  The config to operate on.\n".
-		  "-s <set> The set to operate on.\n".
-		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
+		  "-s <set> The set to operate on.\n";
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:pS:', \%opts);
+getopts('s:c:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
@@ -60,7 +59,7 @@ if (!defined($opts{k})) {
 #if -f is set, read it
 
 #inits zconf
-my $zconf = ZConf->new({sys=>$opts{S}});
+my $zconf = ZConf->new();
 if($zconf->{error}){
 	exit 1;
 }
@@ -103,7 +102,7 @@ If this is defined, the specified set will be removed.
 
 =head1 AUTHOR
 
-Copyright (c) 2008, Zame C. Bowers <vvelox@vvelox.net>
+Copyright (c) 2011, Zame C. Bowers-Hadley <vvelox@vvelox.net>
 
 All rights reserved.
 

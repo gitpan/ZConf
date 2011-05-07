@@ -1682,7 +1682,7 @@ This is the base directory to use for storing the configs in.
 
 =head1 AUTHOR
 
-Zane C. Bowers, C<< <vvelox at vvelox.net> >>
+Zane C. Bowers-Hadley, C<< <vvelox at vvelox.net> >>
 
 =head1 BUGS
 
@@ -1717,19 +1717,20 @@ L<http://cpanratings.perl.org/d/ZConf>
 
 L<http://search.cpan.org/dist/ZConf>
 
-=back
+=item * Subversion Repository
 
+L<http://eesdp.org/svnweb/index.cgi/pubsvn/browse/Perl/ZConf>
+
+=back
 
 =head1 ACKNOWLEDGEMENTS
 
-
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2009 Zane C. Bowers, all rights reserved.
+Copyright 2011 Zane C. Bowers-Hadley, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
 
 =cut
 

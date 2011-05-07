@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#Copyright (c) 2009, Zane C. Bowers
+#Copyright (c) 2011, Zane C. Bowers-Hadley
 #All rights reserved.
 #
 #Redistribution and use in source and binary forms, with or without modification,
@@ -44,13 +44,12 @@ sub main::HELP_MESSAGE {
 		  "-K <second key>  The second key for a comment or meta\n".
 		  "-m  Add a meta.\n".
 		  "-v <value>  The value to set it to.\n".
-		  "-f <file>  The file to read and set it to.\n".
-		  "-S <sys>  Turn on system mode and set it to the specified name.\n";
+		  "-f <file>  The file to read and set it to.\n";
 }
 
 #gets the options
 my %opts=();
-getopts('s:c:Ck:K:mv:f:S:', \%opts);
+getopts('s:c:Ck:K:mv:f:', \%opts);
 
 #makes sure that -c is set
 if (!defined($opts{c})) {
@@ -99,7 +98,7 @@ if (defined($opts{m})) {
 
 
 #inits zconf
-my $zconf = ZConf->new({sys=>$opts{S}});
+my $zconf = ZConf->new();
 if($zconf->{error}){
 	exit 254;
 }
@@ -191,10 +190,6 @@ The choosen/default config will be used.
 
 This is the value to set it to. Either this or -f needs used.
 
-=head2 -S (0|1)
-
-Set sysmode enable/disable.
-
 =head1 EXIT CODES
 
 Any exit code listed below is a ZConf error.
@@ -205,7 +200,7 @@ Improper switch usage.
 
 =head1 AUTHOR
 
-Copyright (c) 2009, Zame C. Bowers <vvelox@vvelox.net>
+Copyright (c) 2011, Zame C. Bowers-Hadley <vvelox@vvelox.net>
 
 All rights reserved.
 

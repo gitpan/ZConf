@@ -15,11 +15,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 5.0.0
+Version 5.1.0
 
 =cut
 
-our $VERSION = '5.0.0';
+our $VERSION = '5.1.0';
 
 =head1 SYNOPSIS
 
@@ -182,7 +182,7 @@ sub new {
 		
 	#make sure the backend is legit
 	my @modules=keys( %{list_modules("ZConf::backends::",{list_modules=>1})} );
-	my $int++;
+	my $int=0;
 	my $backendLegit=0;
 	while ($modules[$int]) {
 		my $beTest=$modules[$int];
@@ -1832,6 +1832,8 @@ One arguement is taken and it is a hash.
 If a value of undef is returned, but no error is set, no
 '#!zconf=override/chooser' is not defined.
 
+This method does not invoke the method updateIfNeeded.
+
 =head3 args hash
 
 =head4 config
@@ -1857,7 +1859,8 @@ sub override{
 	$self->errorBlank;
 
 	#update if if needed
-	$self->updateIfNeeded({config=>$args{config}, clearerror=>1, autocheck=>1});
+	#commenting this out as of currently as it results in a infinite loop for the file backend
+	#$self->updateIfNeeded({config=>$args{config}, clearerror=>1, autocheck=>1});
 
 	#return false if the config is not set
 	if (!defined($args{config})){
@@ -3518,6 +3521,10 @@ sub updatable{
 	#if we are here, it will no error so we don't check
 	my $loadedRev=$self->getLoadedConfigRevision($config);
 
+	if (!defined($loadedRev)) {
+		$loadedRev='';
+	}
+
 	#they are not the same so a update is available
 	if ($backendRev ne $loadedRev) {
 		return 1;
@@ -4464,7 +4471,7 @@ This will be documented more shortly.
 
 =head1 AUTHOR
 
-Zane C. Bowers, C<< <vvelox at vvelox.net> >>
+Zane C. Bowers-Hadley, C<< <vvelox at vvelox.net> >>
 
 =head1 BUGS
 
@@ -4499,15 +4506,18 @@ L<http://cpanratings.perl.org/d/ZConf>
 
 L<http://search.cpan.org/dist/ZConf>
 
-=back
+=item * Subversion Repository
 
+L<http://eesdp.org/svnweb/index.cgi/pubsvn/browse/Perl/ZConf>
+
+=back
 
 =head1 ACKNOWLEDGEMENTS
 
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2009 Zane C. Bowers, all rights reserved.
+Copyright 2011 Zane C. Bowers-Hadley, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
