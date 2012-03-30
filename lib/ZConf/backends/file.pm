@@ -14,11 +14,11 @@ ZConf::backends::file - A configuration system allowing for either file or LDAP 
 
 =head1 VERSION
 
-Version 1.0.0
+Version 2.0.0
 
 =cut
 
-our $VERSION = '1.0.0';
+our $VERSION = '2.0.0';
 
 =head1 SYNOPSIS
 
@@ -168,7 +168,7 @@ sub configExists{
 	if(!-d $self->{args}{base}."/".$config){
 		return 0;
 	}
-		
+
 	return 1;
 }
 
@@ -328,7 +328,7 @@ sub delSet{
 	}
 	
 	#the path to the set
-	my $fullpath=$configpath."/".$set;
+	my $fullpath=$configpath."/".$set.'.set';
 
 	if (!unlink($fullpath)) {
 		$self->{error}=29;
@@ -386,7 +386,11 @@ sub getAvailableSets{
 	#go though the list and return only files
 	my $int=0;
 	while (defined($direntries[$int])) {
-		if (-f $self->{args}{base}."/".$config."/".$direntries[$int]) {
+		if (
+			( -f $self->{args}{base}."/".$config."/".$direntries[$int] ) &&
+			( $direntries[$int] =~ /\.set$/ )
+			){
+			$direntries[$int] =~ s/\.set$//g;
 			push(@sets, $direntries[$int]);
 		}
 		$int++;
@@ -622,7 +626,7 @@ sub read{
 		$args{override}=1;
 	}
 
-	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set};
+	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set}.'.set';
 
 	#return false if the full path does not exist
 	if (!-f $fullpath){
@@ -1364,7 +1368,7 @@ sub writeSetFromZML{
 	}
 
 	#the path to the file
-	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set};
+	my $fullpath=$self->{args}{base}."/".$args{config}."/".$args{set}.'.set';
 
 	#update the revision
 	if (!defined($args{revision})) {

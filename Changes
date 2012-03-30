@@ -1,5 +1,12 @@
 Revision history for ZConf
 
+6.0.0   2012-03-30/07:15
+		-The sets now end with '.set' on the FS backend.
+			 This was done to prevent the config and set names from
+			 colliding. Previously "someConfig/Default" would collide
+			 with the set "Default" for "someConfig". This requires
+			 all sets to be renamed.
+
 5.1.0	2011-05-06/21:50
 		-Remove any references to sys from the scripts.
 		-Add subversion link.

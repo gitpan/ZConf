@@ -15,11 +15,11 @@ ZConf - A configuration system allowing for either file or LDAP backed storage.
 
 =head1 VERSION
 
-Version 5.1.0
+Version 6.0.0
 
 =cut
 
-our $VERSION = '5.1.0';
+our $VERSION = '6.0.0';
 
 =head1 SYNOPSIS
 
