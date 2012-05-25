@@ -7,6 +7,7 @@ use warnings;
 use strict;
 use ZML;
 use Sys::Hostname;
+use base 'Error::Helper';
 
 =head1 NAME
 
@@ -14,11 +15,11 @@ ZConf::backends::file - A configuration system allowing for either file or LDAP 
 
 =head1 VERSION
 
-Version 2.0.0
+Version 2.1.0
 
 =cut
 
-our $VERSION = '2.0.0';
+our $VERSION = '2.1.0';
 
 =head1 SYNOPSIS
 
@@ -49,8 +50,8 @@ This is the copy of the ZConf object intiating it.
 
 This is the variables found in the ~/.config/zconf.zml.
 
-    my $zconf=ZConf::backends::file->new(\%args);
-    if($zconf->{error}){
+    my $zconfbe=ZConf::backends::file->new(\%args);
+    if($zconfbe->error){
 		warn('error: '.$zconf->error.":".$zconf->errorString);
     }
 
@@ -62,7 +63,6 @@ sub new {
 	if(defined($_[1])){
 		%args= %{$_[1]};
 	};
-	my $method='new';
 
 	#The thing that will be returned.
 	#conf holds configs
@@ -89,26 +89,26 @@ sub new {
 	if (!defined( $args{self} )) {
 		$self->{error}=47;
 		$self->{errorString}='No ZConf object passed';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return $self;
 	}
 	if ( ref($args{self}) ne 'ZConf' ) {
 		$self->{error}=47;
 		$self->{errorString}='No ZConf object passed. ref returned "'.ref( $args{self} ).'"';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return $self;
 	}
 	$self->{self}=$args{self};
 	if (!defined( $args{zconf} )) {
 		$self->{error}=48;
 		$self->{errorString}='No zconf.zml var hash passed';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return $self;		
 	}
 	if ( ref($args{zconf}) ne 'HASH' ) {
 		$self->{error}=48;
 		$self->{errorString}='No zconf.zml var hash passed. ref returned "'.ref( $args{zconf} ).'"';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return $self;
 	}
 	$self->{zconf}=$args{zconf};
@@ -126,7 +126,7 @@ sub new {
 		if(!mkdir($self->{args}{base})){
 			$self->{error}=46;
 			$self->{errorString}="'".$self->{args}{base}."' does not exist and could not be created.\n";
-			warn($self->{module}.' '.$method.':'.$self->error.': '.$self->errorString);
+			$self->warn;
 			return $self;
 		}
 	}
@@ -148,9 +148,9 @@ This method methods exactly the same as configExists, but
 for the file backend.
 
 No config name checking is done to verify if it is a legit name or not
-as that is done in configExists. The same is true for calling errorBlank.
+as that is done in configExists. The same is true for calling errorblank.
 
-    $zconf->configExistsFile("foo/bar");
+    $zconfbe->configExistsFile("foo/bar");
 	if($zconf->error){
 		warn('error: '.$zconf->{error}.":".$zconf->errorString);
 	}
@@ -160,9 +160,8 @@ as that is done in configExists. The same is true for calling errorBlank.
 #checks if a file config exists 
 sub configExists{
 	my ($self, $config) = @_;
-	my $method='configExists';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#makes the path if it does not exist
 	if(!-d $self->{args}{base}."/".$config){
@@ -188,15 +187,14 @@ is not checked to see if it is legit or not.
 #creates a new config file as well as the default set
 sub createConfig{
 	my ($self, $config) = @_;
-	my $method='createConfig';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#makes the path if it does not exist
 	if(!mkpath($self->{args}{base}."/".$config)){
 		$self->{error}=16;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."' creation failed.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -219,9 +217,8 @@ present, this method will error.
 sub delConfig{
 	my $self=$_[0];
 	my $config=$_[1];
-	my $method='delConfig';
 
-	$self->errorBlank;
+	$self->errorlank;
 
 	#return if this can't be completed
 	if (defined($self->{error})) {
@@ -233,23 +230,23 @@ sub delConfig{
 	if (defined($subs[0])) {
 		$self->{error}='33';
 		$self->{errorString}='Could not remove the config as it has sub configs';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	#makes sure it exists before continuing
 	#This will also make sure the config exists.
 	my $returned = $self->configExists($config);
-	if (defined($self->{error})){
+	if (defined($self->error)){
 		$self->{error}='12';
 		$self->{errorString}='The config, "'.$config.'", does not exist';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	my @sets=$self->getAvailableSets($config);
-	if (defined($self->{error})) {
-		warn('zconf delConfigFile: getAvailableSetsFile set an error');
+	if (defined($self->error)) {
+		$self->warnString('getAvailableSetsFile set an error');
 		return undef;
 	}
 
@@ -259,7 +256,7 @@ sub delConfig{
 		#removes a set
 		$self->delSet($config, $sets[$setsInt]);
 		if ($self->{error}) {
-			warn('zconf delConfigFile: delSetFileset an error');
+			$self->warnString('delSetFileset an error');
 			return undef;
 		}
 		$setsInt++;
@@ -271,7 +268,7 @@ sub delConfig{
 	if (!rmdir($configpath)) {
 		$self->{error}=29;
 		$self->{errorString}='"'.$configpath.'" could not be unlinked.';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -296,15 +293,14 @@ sub delSet{
 	my $self=$_[0];
 	my $config=$_[1];
 	my $set=$_[2];
-	my $method='delSet';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return if no set is given
 	if (!defined($set)){
 		$self->{error}=24;
 		$self->{errorString}='$set not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -312,7 +308,7 @@ sub delSet{
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -323,7 +319,7 @@ sub delSet{
 	if (!-d $configpath) {
 		$self->{error}=14;
 		$self->{errorString}='"'.$config.'" is not a directory or does not exist';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	
@@ -333,7 +329,7 @@ sub delSet{
 	if (!unlink($fullpath)) {
 		$self->{error}=29;
 		$self->{errorString}='"'.$fullpath.'" could not be unlinked.';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -355,22 +351,21 @@ For the most part it is not intended to be called directly.
 #this gets a set for a given file backed config
 sub getAvailableSets{
 	my ($self, $config) = @_;
-	my $method='getAvailableSets';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#returns 0 if the config does not exist
 	if (!-d $self->{args}{base}."/".$config) {
 		$self->{error}=14;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."' does not exist.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	if (!opendir(CONFIGDIR, $self->{args}{base}."/".$config)) {
 		$self->{error}=15;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."' open failed.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	my @direntries=readdir(CONFIGDIR);
@@ -420,15 +415,14 @@ yet or it has not been read yet by 2.0.0 or newer.
 sub getConfigRevision{
 	my $self=$_[0];
 	my $config=$_[1];
-	my $method='getConfigRevision';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='No config specified';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -436,7 +430,7 @@ sub getConfigRevision{
 	if(!$self->configExists($config)){
 		$self->{error}=12;
 		$self->{errorString}="'".$config."' does not exist.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -446,7 +440,7 @@ sub getConfigRevision{
 	my $revision;
 	if ( -f $revisionfile) {
 		if(!open("THEREVISION", '<', $revisionfile)){
-			warn($self->{module}.' '.$method.':43: '."'".$revisionfile."' open failed");
+			$self->warnString("'".$revisionfile."' open failed");
 		}
 		$revision=join('', <THEREVISION>);
 		close(THEREVISION);
@@ -473,22 +467,21 @@ One arguement is accepted and that is the config to look under.
 #gets the configs under a config
 sub getSubConfigs{
 	my ($self, $config)= @_;
-	my $method='getSubConfigsFile';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#returns 0 if the config does not exist
 	if(!-d $self->{args}{base}."/".$config){
 		$self->{error}=14;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."' does not exist.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	if(!opendir(CONFIGDIR, $self->{args}{base}."/".$config)){
 		$self->{error}=15;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."' open failed.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	my @direntries=readdir(CONFIGDIR);
@@ -534,28 +527,27 @@ The returned value is a boolean value.
 sub isConfigLocked{
 	my $self=$_[0];
 	my $config=$_[1];
-	my $method='isConfigLocked';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='No config specified';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	#makes sure it exists
 	my $exists=$self->configExists($config);
     if ($self->{error}) {
-		warn($self->{module}.' '.$method.': configExists errored');
+		$self->warnString('configExists errored');
 		return undef;
 	}
 	if (!$exists) {
 		$self->{error}=12;
 		$self->{errorString}='The config, "'.$config.'", does not exist';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -566,7 +558,7 @@ sub isConfigLocked{
 		return 1;
 	}
 
-	return undef;
+	return 0;
 }
 
 =head2 read
@@ -601,15 +593,14 @@ The set for that config to load.
 sub read{
 	my $self=$_[0];
 	my %args=%{$_[1]};
-	my $method='read';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($args{config})){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -617,8 +608,8 @@ sub read{
 	if (!defined($args{set})){
 		$self->{error}=24;
 		$self->{errorString}='$arg{set} not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
-		return undef;			
+		$self->warn;
+		return undef;
 	}
 
 	#default to overriding
@@ -655,7 +646,7 @@ sub read{
 		$self->{error}=28;
 		$self->{errorString}='$zml->parse errored. $zml->{error}="'.$zml->{error}.'" '.
 		                     '$zml->{errorString}="'.$zml->{errorString}.'"';
-		warn($self->{module}.' '.$method.':'.$self->{errror}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -673,7 +664,7 @@ sub read{
 	#creates it if necesary
 	if ( -f $revisionfile) {
 		if(!open("THEREVISION", '<', $revisionfile)){
-			warn($self->{module}.' '.$method.':43: '."'".$revisionfile."' open failed");
+			$self->warnString(':43: '."'".$revisionfile."' open failed");
 			$self->{revision}{$args{config}}=time.' '.hostname.' '.rand();
 		}
 		$self->{revision}{$args{config}}=join('', <THEREVISION>);
@@ -684,7 +675,7 @@ sub read{
 		if(!open("THEREVISION", '>', $revisionfile)){
 			$self->{error}=43;
 			$self->{errorString}="'".$revisionfile."' open failed";
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef;
 		}
 		print THEREVISION $self->{revision}{$args{config}};
@@ -723,15 +714,14 @@ and only really intended for internal use.
 #this gets the chooser for a the config... for the file backend
 sub readChooser{
 	my ($self, $config)= @_;
-	my $method='readChooser';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -740,7 +730,7 @@ sub readChooser{
 	if(defined($error)){
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 		
@@ -748,7 +738,7 @@ sub readChooser{
 	if(!$self->configExists($config)){
 		$self->{error}=12;
 		$self->{errorString}="'".$config."' does not exist.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -764,7 +754,7 @@ sub readChooser{
 	if(!open("READCHOOSER", $chooser)){
 		$self->{error}=15;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."/.chooser' read failed.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	my $chooserstring=<READCHOOSER>;
@@ -794,16 +784,15 @@ set is used. This is done by calling 'defaultSetExists'.
 
 sub setExists{
 	my ($self, $config, $set)= @_;
-	my $method='setExists';
 
 	#blank any errors
-	$self->errorBlank;
+	$self->errorblank;
 
 	#this will get what set to use if it is not specified
 	if (!defined($set)) {
 		return $self->defaultSetExists($config);
-		if ($self->{error}) {
-			warn('ZConf setExists: No set specified and defaultSetExists errored');
+		if ($self->error) {
+			$self->warnString('No set specified and defaultSetExists errored');
 			return undef;
 		}
 	}
@@ -864,28 +853,27 @@ sub setLockConfig{
 	my $self=$_[0];
 	my $config=$_[1];
 	my $lock=$_[2];
-	my $method='setLockConfig';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='No config specified';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	#makes sure it exists
 	my $exists=$self->configExists($config);
     if ($self->{error}) {
-		warn($self->{module}.' '.$method.': configExists errored');
+		$self->warnString('configExists errored');
 		return undef;
 	}
 	if (!$exists) {
 		$self->{error}=12;
 		$self->{errorString}='The config, "'.$config.'", does not exist';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -897,7 +885,7 @@ sub setLockConfig{
 		if(!open("THELOCK", '>', $lockfile)){
 			$self->{error}=44;
 			$self->{errorString}="'".$lockfile."' open failed";
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef;
         }
         print THELOCK time."\n".hostname;
@@ -911,7 +899,7 @@ sub setLockConfig{
 		if (!unlink($lockfile)) {
 			$self->{error}=44;
 			$self->{errorString}='"'.$lockfile.'" could not be unlinked.';
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef;
 		}
 	}
@@ -933,28 +921,27 @@ writeChooser, which it methods the same as. It works on the file backend.
 
 sub writeChooser{
 	my ($self, $config, $chooserstring)= @_;
-	my $method='writeChooser';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($config)){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($config);
 	if ($self->{error}) {
-		warn($self->{module}.' '.$method.': isconfigLockedFile errored');
+		$self->warnString('isconfigLockedFile errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$config.'" is locked';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -962,7 +949,7 @@ sub writeChooser{
 	if (!defined($chooserstring)){
 		$self->{error}=40;
 		$self->{errorString}='\$chooserstring not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -971,7 +958,7 @@ sub writeChooser{
 	if(defined($error)){
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -981,7 +968,7 @@ sub writeChooser{
 	if(!open("WRITECHOOSER", ">", $chooser)){
 		$self->{error}=15;
 		$self->{errorString}="'".$self->{args}{base}."/".$config."/.chooser' open failed.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 	}
 	print WRITECHOOSER $chooserstring;
 	close("WRITECHOOSER");		
@@ -1032,15 +1019,14 @@ sub writeSetFromHash{
 	my $self = $_[0];
 	my %args=%{$_[1]};
 	my %hash = %{$_[2]};
-	my $method='writeSetFromHash';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($args{config})){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -1049,7 +1035,7 @@ sub writeSetFromHash{
 	if(defined($error)){
 		$self->{error}=$error;
 		$self->{errorString}=$errorString;
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -1062,7 +1048,7 @@ sub writeSetFromHash{
 		}else{
 			$self->{error}=27;
 			$self->{errorString}="'".$args{set}."' is not a legit set name.";
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef
 		}
 	}
@@ -1071,20 +1057,20 @@ sub writeSetFromHash{
 	if(!$self->configExists($args{config})){
 		$self->{error}=12;
 		$self->{errorString}="'".$args{config}."' does not exist.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($args{config});
-	if ($self->{error}) {
-		warn($self->{module}.' '.$method.': isconfigLockedFile errored');
+	if ($self->error) {
+		$self->warnString('isconfigLockedFile errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$args{config}.'" is locked';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 		
@@ -1113,8 +1099,8 @@ sub writeSetFromHash{
 					$zml->addMeta($hashkeys[$hashkeysInt], $metakeys[$metaInt], $hash{ $hashkeys[$hashkeysInt] }{ $metakeys[$metaInt] } );
 					#checks to verify there was no error
 					#this is not a fatal error... skips it if it is not legit
-					if(defined($zml->{error})){
-						warn($self->{module}.' '.$method.':23: $zml->addMeta() returned '.
+					if(defined($zml->error)){
+						$self->warnString('23: $zml->addMeta() returned '.
 							 $zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
 							 $hashkeys[$hashkeysInt]."' in '".$args{config}."'.");
 					}
@@ -1130,7 +1116,7 @@ sub writeSetFromHash{
 					#checks to verify there was no error
 					#this is not a fatal error... skips it if it is not legit
 					if(defined($zml->{error})){
-						warn($self->{module}.' '.$method.':23: $zml->addComment() returned '.
+						$self->warnString('23: $zml->addComment() returned '.
 							 $zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
 							 $hashkeys[$hashkeysInt]."' in '".$args{config}."'.");
 					}
@@ -1141,8 +1127,8 @@ sub writeSetFromHash{
 			$zml->addVar($hashkeys[$hashkeysInt], $hash{$hashkeys[$hashkeysInt]});
 			#checks to verify there was no error
 			#this is not a fatal error... skips it if it is not legit
-			if(defined($zml->{error})){
-				warn($self->{module}.' '.$method.':23: $zml->addVar returned '.
+			if(defined($zml->error)){
+				$self->warnString('23: $zml->addVar returned '.
 					 $zml->{error}.", '".$zml->{errorString}."'. Skipping variable '".
 					 $hashkeys[$hashkeysInt]."' in '".$args{config}."'.");
 			}
@@ -1155,7 +1141,7 @@ sub writeSetFromHash{
 	$args{zml}=$zml;
 	$self->writeSetFromZML(\%args);
 	if ($self->error) {
-			warn($self->{module}.' '.$method.': writeSetFromZML failed');
+			$self->warnString('writeSetFromZML failed');
 			return undef		
 	}
 
@@ -1202,35 +1188,34 @@ are doing.
 sub writeSetFromLoadedConfig{
 	my $self = $_[0];
 	my %args=%{$_[1]};
-	my $method='writeSetFromLoadedConfig';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($args{config})){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
 	if(! $self->{self}->isConfigLoaded( $args{config} ) ){
 		$self->{error}=25;
 		$self->{errorString}="Config '".$args{config}."' is not loaded";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($args{config});
 	if ($self->{error}) {
-		warn($self->{module}.' '.$method.': isconfigLockedFile errored');
+		$self->warnString('isconfigLockedFile errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$args{config}.'" is locked';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -1243,7 +1228,7 @@ sub writeSetFromLoadedConfig{
 		}else{
 			$self->{error}=27;
 			$self->{errorString}="'".$args{set}."' is not a legit set name.";
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef
 		}
 	}
@@ -1260,7 +1245,7 @@ sub writeSetFromLoadedConfig{
 	if ($self->{self}->error) {
 			$self->{error}=14;
 			$self->{errorString}='Failed to dump to ZML. error='.$self->{self}->error.' errorString='.$self->{self}->errorString;
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef		
 	}
 	$args{zml}=$zml;
@@ -1268,7 +1253,7 @@ sub writeSetFromLoadedConfig{
 	#writes out the config
 	$self->writeSetFromZML(\%args);
 	if ($self->error) {
-			warn($self->{module}.' '.$method.': writeSetFromZML failed');
+			$self->warnString('writeSetFromZML failed');
 			return undef		
 	}
 
@@ -1314,15 +1299,14 @@ are doing.
 sub writeSetFromZML{
 	my $self = $_[0];
 	my %args=%{$_[1]};
-	my $method='writeSetFromZML';
 
-	$self->errorBlank;
+	$self->errorblank;
 
 	#return false if the config is not set
 	if (!defined($args{config})){
 		$self->{error}=25;
 		$self->{errorString}='$config not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;			
 	}
 
@@ -1330,26 +1314,26 @@ sub writeSetFromZML{
 	if (!defined( $args{zml} )) {
 		$self->{error}=20;
 		$self->{errorString}='$args{zml} is not defined';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	if ( ref($args{zml}) ne "ZML" ) {
 		$self->{error}=20;
 		$self->{errorString}='$args{zml} is not a ZML';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
 	#checks if it is locked or not
 	my $locked=$self->isConfigLocked($args{config});
-	if ($self->{error}) {
-		warn($self->{module}.' '.$method.': isconfigLockedFile errored');
+	if ($self->error) {
+		$self->warnString('isconfigLockedFile errored');
 		return undef;
 	}
 	if ($locked) {
 		$self->{error}=45;
 		$self->{errorString}='The config "'.$args{config}.'" is locked';
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 
@@ -1362,7 +1346,7 @@ sub writeSetFromZML{
 		}else{
 			$self->{error}=27;
 			$self->{errorString}="'".$args{set}."' is not a legit set name.";
-			warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+			$self->warn;
 			return undef
 		}
 	}
@@ -1383,7 +1367,7 @@ sub writeSetFromZML{
 	if(!open("THEFILE", '>', $fullpath)){
 		$self->{error}=15;
 		$self->{errorString}="'".$self->{args}{base}."/".$args{config}."/.chooser' open failed.";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	print THEFILE $zml->string();
@@ -1400,7 +1384,7 @@ sub writeSetFromZML{
 	if(!open("THEREVISION", '>', $revisionfile)){
 		$self->{error}=43;
 		$self->{errorString}="'".$revisionfile."' open failed";
-		warn($self->{module}.' '.$method.':'.$self->{error}.': '.$self->{errorString});
+		$self->warn;
 		return undef;
 	}
 	print THEREVISION $args{revision};
@@ -1411,61 +1395,10 @@ sub writeSetFromZML{
 	return $args{revision};
 }
 
-=head1 ERROR RELATED METHODS
+=head1 ERROR HANDLING/CODES
 
-=head2 error
-
-Returns the current error code and true if there is an error.
-
-If there is no error, undef is returned.
-
-    if( $zconf->error ){
-		warn('error: '.$zconf->error.":".$zconf->errorString);
-    }
-
-=cut
-
-sub error{
-    return $_[0]->{error};
-}
-
-=head2 errorBlank
-
-This blanks the error storage and is only meant for internal usage.
-
-It does the following.
-
-	$zconf->{error}=undef;
-	$zconf->{errorString}="";
-
-=cut
-	
-#blanks the error flags
-sub errorBlank{
-	my $self=$_[0];
-		
-	$self->{error}=undef;
-	$self->{errorString}="";
-	
-	return 1;
-};
-
-=head2 errorString
-
-Returns the error string if there is one. If there is not,
-it will return ''.
-
-    if( $zconf->error ){
-		warn('error: '.$zconf->error.":".$zconf->errorString);
-    }
-
-=cut
-
-sub errorString{
-    return $_[0]->{errorString};
-}
-
-=head1 ERROR CODES
+This module uses L<Error::Helper> for error handling. Below are the
+error codes returned by the error method.
 
 =head2 1
 

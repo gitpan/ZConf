@@ -1,5 +1,9 @@
 Revision history for ZConf
 
+6.1.0	 2012-05-25/15:40
+		 -Lots of misc cleanups.
+		 -Now uses Error::Helper.
+
 6.0.0   2012-03-30/07:15
 		-The sets now end with '.set' on the FS backend.
 			 This was done to prevent the config and set names from

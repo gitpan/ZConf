@@ -24,4 +24,4 @@ bin/zcset
 bin/zcvdel
 bin/zcvls
 bin/zccdump
-
+zconf ldap.schema
